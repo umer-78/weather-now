@@ -1,0 +1,10 @@
+{
+  "name": "weather-now",
+  "version": "1.0.0",
+  "description": "Weather dashboard using the keyless Open-Meteo API.",
+  "type": "module",
+  "private": true,
+  "scripts": { "test": "node --test", "start": "python3 -m http.server 8080" },
+  "author": "Umer Hashmi",
+  "license": "MIT"
+}
