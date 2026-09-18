@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weather Now</title>
+  <meta name="description" content="Current conditions, an hourly strip and a seven-day forecast, from the keyless Open-Meteo API.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230284c7'/><circle cx='13' cy='13' r='5' fill='%23fbbf24'/><path d='M9 22h14a4 4 0 000-8 6 6 0 00-11-2 4 4 0 00-3 10z' fill='white'/></svg>">
+  <link rel="stylesheet" href="src/base.css">
+  <link rel="stylesheet" href="src/app.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <h1>Weather Now</h1>
+        <p>Current conditions and a seven-day forecast. No API key, no tracking.</p>
+      </div>
+      <a href="https://github.com/umer-78/weather-now">Source on GitHub</a>
+    </header>
+
+    <form id="searchForm" class="row" autocomplete="off">
+      <div>
+        <label for="place" class="sr-only">Place</label>
+        <input id="place" type="search" placeholder="Search a city — Lahore, Karachi, London…" required>
+      </div>
+      <button class="primary" type="submit">Search</button>
+      <button type="button" id="locate">Use my location</button>
+      <button type="button" id="units" aria-label="Switch units">°C</button>
+    </form>
+    <div id="suggestions" class="suggestions" hidden></div>
+    <p class="error" id="error" role="alert"></p>
+
+    <section class="card current" id="current" hidden>
+      <div class="now">
+        <div class="icon" id="nowIcon">☀️</div>
+        <div>
+          <div class="temp" id="nowTemp">—</div>
+          <div class="place" id="nowPlace"></div>
+          <div class="muted" id="nowSummary"></div>
+        </div>
+      </div>
+      <dl class="facts" id="facts"></dl>
+    </section>
+
+    <section class="card" id="hourlyCard" hidden>
+      <h2>Next 12 hours</h2>
+      <div class="strip" id="hourly"></div>
+    </section>
+
+    <section class="card" id="dailyCard" hidden>
+      <h2>Seven days</h2>
+      <div class="days" id="daily"></div>
+    </section>
+
+    <footer>Data from <a href="https://open-meteo.com/">Open-Meteo</a>, free for non-commercial use. Built by <a href="https://github.com/umer-78">Umer Hashmi</a>.</footer>
+  </div>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
