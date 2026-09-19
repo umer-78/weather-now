@@ -16,9 +16,21 @@ function load(key) { try { return localStorage.getItem(key); } catch { return nu
 function save(key, value) { try { localStorage.setItem(key, value); } catch { /* private mode */ } }
 
 async function getJson(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`The weather service answered ${response.status}.`);
-  return response.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`The weather service answered ${response.status}.`);
+    return await response.json();
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('The weather service took too long to respond.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function search(query) {
@@ -29,9 +41,11 @@ async function search(query) {
 
 async function show(place) {
   $('error').textContent = '';
+  const data = await getJson(forecastQuery(place.latitude, place.longitude));
+
+  // Only remember a place after its forecast has loaded successfully.
   state.place = place;
   save('weather:place', JSON.stringify(place));
-  const data = await getJson(forecastQuery(place.latitude, place.longitude));
   state.data = data;
   render();
 }
@@ -58,7 +72,7 @@ function render() {
   ];
   $('facts').innerHTML = facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
 
-  $('hourly').innerHTML = nextHours(data.hourly).map((hour) => `
+  $('hourly').innerHTML = nextHours(data.hourly, data.current?.time).map((hour) => `
     <div class="hour">
       <div class="h">${esc(hour.label)}</div>
       <div class="i">${describeCode(hour.code).icon}</div>
@@ -142,7 +156,14 @@ $('locate').addEventListener('click', () => {
         $('error').textContent = '';
       } catch (err) { fail(err); }
     },
-    () => { $('error').textContent = 'Location permission was declined.'; },
+    (err) => {
+      const messages = {
+        1: 'Location permission was denied.',
+        2: 'Your location could not be determined.',
+        3: 'Location lookup timed out.',
+      };
+      $('error').textContent = messages[err.code] ?? 'Unable to determine your location.';
+    },
     { timeout: 10000 },
   );
 });

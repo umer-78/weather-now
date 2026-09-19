@@ -68,7 +68,10 @@ export function dailyFromResponse(daily) {
   if (!daily?.time?.length) return [];
   return daily.time.map((date, i) => ({
     date,
-    weekday: new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' }),
+    // Open-Meteo's daily `date` is already the calendar date in the
+    // requested forecast timezone. Using UTC here prevents the computer's
+    // local timezone from changing the displayed weekday.
+    weekday: new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }),
     max: daily.temperature_2m_max[i],
     min: daily.temperature_2m_min[i],
     code: daily.weather_code[i],
@@ -81,7 +84,19 @@ export function dailyFromResponse(daily) {
 /** Next 12 hours from "now", skipping the hours already gone. */
 export function nextHours(hourly, from = new Date(), count = 12) {
   if (!hourly?.time?.length) return [];
-  const start = hourly.time.findIndex((t) => new Date(t) >= from);
+
+  // Open-Meteo returns local wall-clock timestamps when timezone=auto.
+  // Prefer its current.time string so a user viewing another timezone does
+  // not have their computer's timezone silently shift the hourly selection.
+  const reference = typeof from === 'string'
+    ? from.slice(0, 16)
+    : (() => {
+        const date = new Date(from);
+        const pad = (value) => String(value).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      })();
+
+  const start = hourly.time.findIndex((t) => t.slice(0, 16) >= reference);
   const begin = start === -1 ? 0 : start;
   return hourly.time.slice(begin, begin + count).map((time, i) => ({
     time,
