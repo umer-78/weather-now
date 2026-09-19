@@ -67,7 +67,8 @@ test('daily forecast is grouped with everything the strip shows', () => {
   assert.equal(days.length, 2);
   assert.equal(days[1].rainChance, 70);
   assert.equal(days[0].sunrise, '06:12');
-  assert.ok(days[0].weekday.length >= 3);
+  assert.equal(days[0].weekday, 'Thu');
+  assert.equal(days[1].weekday, 'Fri');
   assert.deepEqual(dailyFromResponse(null), []);
 });
 
@@ -82,6 +83,12 @@ test('hourly starts from now, not from midnight', () => {
   const hours = nextHours(hourly, from, 2);
   assert.deepEqual(hours.map((h) => h.label), ['10:00', '11:00']);
   assert.equal(hours[0].temperature, 28);
+
+  // Open-Meteo's current.time is a local wall-clock timestamp. Comparing it
+  // as a string keeps hourly selection tied to the forecast timezone rather
+  // than the computer running the browser.
+  const localHours = nextHours(hourly, '2026-09-17T09:30', 2);
+  assert.deepEqual(localHours.map((h) => h.label), ['10:00', '11:00']);
   assert.deepEqual(nextHours(null), []);
   // when every hour is in the past, fall back to what there is rather than showing nothing
   assert.equal(nextHours(hourly, new Date('2027-01-01T00:00'), 2).length, 2);
