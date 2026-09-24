@@ -52,6 +52,25 @@ export function windChill(celsius, windKph) {
   return 13.12 + 0.6215 * celsius - 11.37 * windKph ** 0.16 + 0.3965 * celsius * windKph ** 0.16;
 }
 
+/** Dew point in °C from air temperature and relative humidity (Magnus formula). */
+export function dewPoint(celsius, humidity) {
+  if (celsius == null || humidity == null || humidity <= 0) return null;
+  const a = 17.62;
+  const b = 243.12;
+  const gamma = Math.log(Math.min(humidity, 100) / 100) + (a * celsius) / (b + celsius);
+  return (b * gamma) / (a - gamma);
+}
+
+/** How the air feels, from the dew point: the usual comfort bands. */
+export function comfortLevel(dewPointC) {
+  if (dewPointC == null) return 'unknown';
+  if (dewPointC < 10) return 'dry';
+  if (dewPointC < 16) return 'comfortable';
+  if (dewPointC < 21) return 'humid';
+  if (dewPointC < 24) return 'muggy';
+  return 'oppressive';
+}
+
 export function summarise(current) {
   const { text } = describeCode(current.weather_code);
   const feels = Math.round(current.apparent_temperature);

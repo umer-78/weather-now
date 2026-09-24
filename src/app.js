@@ -1,6 +1,6 @@
 import {
   describeCode, formatTemperature, windDirection, uvAdvice, summarise,
-  dailyFromResponse, nextHours, forecastQuery, GEOCODE_URL, placeLabel,
+  dailyFromResponse, nextHours, forecastQuery, GEOCODE_URL, placeLabel, dewPoint, comfortLevel,
 } from './weather.js';
 
 const $ = (id) => document.getElementById(id);
@@ -61,9 +61,11 @@ function render() {
   $('nowSummary').textContent = summarise(current);
 
   const uv = uvAdvice(data.daily?.uv_index_max?.[0]);
+  const dew = dewPoint(current.temperature_2m, current.relative_humidity_2m);
   const facts = [
     ['Feels like', formatTemperature(current.apparent_temperature, unit)],
     ['Humidity', `${current.relative_humidity_2m}%`],
+    ['Dew point', dew == null ? '—' : `${formatTemperature(dew, unit)} (${comfortLevel(dew)})`],
     ['Wind', `${Math.round(current.wind_speed_10m)} km/h ${windDirection(current.wind_direction_10m)}`],
     ['Rain now', `${current.precipitation ?? 0} mm`],
     ['UV today', `${data.daily?.uv_index_max?.[0] ?? '—'} (${uv.level})`],
