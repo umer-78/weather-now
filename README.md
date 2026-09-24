@@ -19,7 +19,7 @@ No framework, no build step, no tracking.
 
 - City search with disambiguation (three Lahores? pick the right one) and
   "use my location" through the browser's geolocation
-- Feels-like, humidity, wind speed **and compass direction**, rain, UV with the
+- Feels-like, humidity, **dew point with a comfort level**, wind speed **and compass direction**, rain, UV with the
   WHO advice band, sunrise and sunset
 - Hourly strip that starts from **now**, not from midnight
 - Seven-day forecast with a temperature range bar and rain chance
@@ -32,7 +32,7 @@ No framework, no build step, no tracking.
 Node's runner:
 
 ```bash
-node --test      # 10 tests
+node --test      # 12 tests
 ```
 
 Covering the WMO weather-code table, temperature conversion and rounding,

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   describeCode, formatTemperature, toFahrenheit, windDirection, uvAdvice, windChill,
-  summarise, dailyFromResponse, nextHours, forecastQuery, placeLabel,
+  summarise, dailyFromResponse, nextHours, forecastQuery, placeLabel, dewPoint, comfortLevel,
 } from '../src/weather.js';
 
 test('weather codes map to text and an icon', () => {
@@ -107,4 +107,22 @@ test('the forecast URL asks for everything the page renders', () => {
 test('place labels skip missing parts', () => {
   assert.equal(placeLabel({ name: 'Lahore', admin1: 'Punjab', country_code: 'PK' }), 'Lahore, Punjab, PK');
   assert.equal(placeLabel({ name: 'Singapore', country_code: 'SG' }), 'Singapore, SG');
+});
+
+test('dew point matches reference values', () => {
+  // 20 °C at 50 % RH is about 9.3 °C; saturated air's dew point equals its temperature
+  assert.ok(Math.abs(dewPoint(20, 50) - 9.3) < 0.1);
+  assert.ok(Math.abs(dewPoint(25, 100) - 25) < 1e-9);
+  assert.ok(dewPoint(-5, 80) < -5);
+  assert.equal(dewPoint(20, 0), null);
+  assert.equal(dewPoint(null, 50), null);
+});
+
+test('comfort bands follow the dew point', () => {
+  assert.equal(comfortLevel(5), 'dry');
+  assert.equal(comfortLevel(12), 'comfortable');
+  assert.equal(comfortLevel(18), 'humid');
+  assert.equal(comfortLevel(22), 'muggy');
+  assert.equal(comfortLevel(26), 'oppressive');
+  assert.equal(comfortLevel(null), 'unknown');
 });
