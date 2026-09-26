@@ -1,10 +1,13 @@
 {
   "name": "weather-now",
   "version": "1.0.0",
-  "description": "Weather dashboard using the keyless Open-Meteo API.",
+  "description": "Weather dashboard on the keyless Open-Meteo API: current conditions, hourly strip from now, seven-day forecast, UV advice and unit switching.",
   "type": "module",
   "private": true,
-  "scripts": { "test": "node --test", "start": "python3 -m http.server 8080" },
+  "scripts": {
+    "test": "node --test",
+    "start": "python3 -m http.server 8080"
+  },
   "author": "Umer Hashmi",
   "license": "MIT"
 }
