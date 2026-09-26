@@ -15,12 +15,22 @@ const CODES = {
   95: ['Thunderstorm', '⛈️'], 96: ['Thunderstorm with hail', '⛈️'], 99: ['Thunderstorm with hail', '⛈️'],
 };
 
-export function describeCode(code) {
+// Icons with the sun in them, and what to show instead after dark.
+const NIGHT = { '☀️': '🌙', '🌤️': '🌙', '⛅': '☁️', '🌦️': '🌧️' };
+
+/** `isDay` is Open-Meteo's is_day: 1 in daylight, 0 at night. */
+export function describeCode(code, isDay = 1) {
   const [text, icon] = CODES[code] ?? ['Unknown', '❓'];
-  return { text, icon };
+  return { text, icon: isDay === 0 ? NIGHT[icon] ?? icon : icon };
 }
 
 export const toFahrenheit = (celsius) => (celsius * 9) / 5 + 32;
+
+/** Precipitation as the forecast gives it (0.1 mm steps); '' when there is none. */
+export function formatPrecipitation(mm) {
+  if (mm == null || Number.isNaN(mm) || mm < 0.05) return '';
+  return `${mm < 10 ? Math.round(mm * 10) / 10 : Math.round(mm)} mm`;
+}
 
 export function formatTemperature(celsius, unit = 'c') {
   if (celsius === null || celsius === undefined || Number.isNaN(celsius)) return '—';
@@ -38,6 +48,8 @@ export function windDirection(degrees) {
 /** UV index bands, as published by the WHO. */
 export function uvAdvice(index) {
   if (index === null || index === undefined) return { level: 'unknown', advice: '' };
+  // The bands are defined on the whole-number index, so 7.6 is 8: very high.
+  index = Math.round(index);
   if (index < 3) return { level: 'low', advice: 'No protection needed.' };
   if (index < 6) return { level: 'moderate', advice: 'Wear sunglasses; use sunscreen at midday.' };
   if (index < 8) return { level: 'high', advice: 'Sunscreen, hat, shade between 11am and 4pm.' };
@@ -71,15 +83,21 @@ export function comfortLevel(dewPointC) {
   return 'oppressive';
 }
 
-export function summarise(current) {
+export function summarise(current, unit = 'c') {
   const { text } = describeCode(current.weather_code);
-  const feels = Math.round(current.apparent_temperature);
-  const actual = Math.round(current.temperature_2m);
-  const difference = feels - actual;
+  // Decided in °C, so switching units does not change whether it is mentioned.
+  const difference = Math.round(current.apparent_temperature) - Math.round(current.temperature_2m);
+  const shown = (celsius) => Math.round(unit === 'f' ? toFahrenheit(celsius) : celsius);
   if (Math.abs(difference) >= 3) {
-    return `${text}, ${actual}° but feels like ${feels}°.`;
+    return `${text}, ${shown(current.temperature_2m)}° but feels like ${shown(current.apparent_temperature)}°.`;
   }
-  return `${text}, ${actual}°.`;
+  return `${text}, ${shown(current.temperature_2m)}°.`;
+}
+
+/** Where a day's min–max sits on the week's scale: CSS percentages in from each end. */
+export function rangeBar(min, max, coldest, hottest) {
+  const span = hottest - coldest || 1;
+  return { left: ((min - coldest) * 100) / span, right: ((hottest - max) * 100) / span };
 }
 
 /** Group the hourly series into days for the forecast strip. */
@@ -95,6 +113,7 @@ export function dailyFromResponse(daily) {
     min: daily.temperature_2m_min[i],
     code: daily.weather_code[i],
     rainChance: daily.precipitation_probability_max?.[i] ?? null,
+    precipitation: daily.precipitation_sum?.[i] ?? null,
     sunrise: daily.sunrise?.[i]?.slice(11, 16) ?? null,
     sunset: daily.sunset?.[i]?.slice(11, 16) ?? null,
   }));
@@ -123,6 +142,8 @@ export function nextHours(hourly, from = new Date(), count = 12) {
     temperature: hourly.temperature_2m[begin + i],
     code: hourly.weather_code[begin + i],
     rainChance: hourly.precipitation_probability?.[begin + i] ?? null,
+    precipitation: hourly.precipitation?.[begin + i] ?? null,
+    isDay: hourly.is_day?.[begin + i],
   }));
 }
 
@@ -133,8 +154,8 @@ export function forecastQuery(latitude, longitude, timezone = 'auto') {
   return `${FORECAST_URL}?${new URLSearchParams({
     latitude, longitude, timezone,
     current: 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day,precipitation',
-    hourly: 'temperature_2m,weather_code,precipitation_probability',
-    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max',
+    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,is_day',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,uv_index_max',
     forecast_days: '7',
   })}`;
 }
