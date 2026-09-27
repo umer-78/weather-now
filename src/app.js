@@ -71,6 +71,11 @@ document.addEventListener('visibilitychange', refreshIfStale);
 window.addEventListener('pageshow', refreshIfStale);
 setInterval(refreshIfStale, 60 * 1000);
 
+/** The units button names the unit in use, whether or not a forecast has loaded yet. */
+function showUnit() {
+  $('units').textContent = state.unit === 'c' ? '°C' : '°F';
+}
+
 function render() {
   const { data, place, unit } = state;
   if (!data) return;
@@ -135,7 +140,6 @@ function render() {
     $('mapCard').hidden = false;
     globe.setPlace(place);
   }
-  $('units').textContent = unit === 'c' ? '°C' : '°F';
   document.title = `${formatTemperature(current.temperature_2m, unit)} ${placeLabel(place)} — Weather Now`;
 }
 
@@ -177,8 +181,10 @@ $('searchForm').addEventListener('submit', (e) => {
 $('units').addEventListener('click', () => {
   state.unit = state.unit === 'c' ? 'f' : 'c';
   save('weather:unit', state.unit);
+  showUnit();
   render();
 });
+showUnit();
 
 $('locate').addEventListener('click', () => {
   if (!navigator.geolocation) {
