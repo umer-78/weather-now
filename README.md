@@ -1,6 +1,8 @@
 # Weather Now
 
 [![CI](https://github.com/umer-78/weather-now/actions/workflows/ci.yml/badge.svg)](https://github.com/umer-78/weather-now/actions/workflows/ci.yml)
+
+[![Weather Now: the live demo](.github/preview.jpg)](https://umer-78.github.io/weather-now/)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-f7df1e)
 ![No API key](https://img.shields.io/badge/API%20key-not%20required-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
