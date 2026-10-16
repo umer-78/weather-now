@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   describeCode, formatTemperature, formatPrecipitation, toFahrenheit, windDirection, uvAdvice, windChill,
   summarise, dailyFromResponse, nextHours, forecastQuery, placeLabel, dewPoint, comfortLevel, rangeBar,
+  formatWind, reverseQuery, placeFromReverse,
 } from '../src/weather.js';
 
 test('weather codes map to text and an icon', () => {
@@ -176,4 +177,42 @@ test('comfort bands follow the dew point', () => {
   assert.equal(comfortLevel(22), 'muggy');
   assert.equal(comfortLevel(26), 'oppressive');
   assert.equal(comfortLevel(null), 'unknown');
+});
+
+test('wind follows the unit system of the temperature', () => {
+  assert.equal(formatWind(9.4), '9 km/h');
+  assert.equal(formatWind(9.4, 'c'), '9 km/h');
+  assert.equal(formatWind(9.4, 'f'), '6 mph');
+  assert.equal(formatWind(100, 'f'), '62 mph');
+  assert.equal(formatWind(null), '—');
+});
+
+test('the forecast asks for gusts as well as the mean wind', () => {
+  const current = new URL(forecastQuery(31.52, 74.35)).searchParams.get('current').split(',');
+  assert.ok(current.includes('wind_speed_10m') && current.includes('wind_gusts_10m'));
+});
+
+test('a reverse lookup asks for as much detail as the map is zoomed to', () => {
+  const zoom = (url) => new URL(url).searchParams.get('zoom');
+  assert.equal(zoom(reverseQuery(31.5, 74.3)), '10');
+  assert.equal(zoom(reverseQuery(31.5, 74.3, 13.6)), '14');
+  assert.equal(zoom(reverseQuery(31.5, 74.3, 18)), '14', 'never finer than a neighbourhood');
+  assert.equal(zoom(reverseQuery(31.5, 74.3, 2)), '8');
+  assert.ok(reverseQuery(31.5, 74.3).startsWith('https://nominatim.openstreetmap.org/reverse?'));
+});
+
+test('a reverse lookup becomes a place with its province or town', () => {
+  assert.deepEqual(placeFromReverse({
+    name: 'Lahore', address: { city: 'Lahore', state: 'Punjab', country: 'Pakistan', country_code: 'pk' },
+  }), { name: 'Lahore', admin1: 'Punjab', country_code: 'PK' });
+  // zoomed in: the neighbourhood, within its town
+  assert.deepEqual(placeFromReverse({
+    name: 'Gulberg', address: { suburb: 'Gulberg', city: 'Lahore', state: 'Punjab', country_code: 'pk' },
+  }), { name: 'Gulberg', admin1: 'Lahore', country_code: 'PK' });
+  // no name of its own: the best part of the address
+  assert.deepEqual(placeFromReverse({ name: '', address: { village: 'Kalam', state: 'Khyber Pakhtunkhwa', country_code: 'pk' } }),
+    { name: 'Kalam', admin1: 'Khyber Pakhtunkhwa', country_code: 'PK' });
+  // open water: Nominatim has nothing
+  assert.equal(placeFromReverse({ error: 'Unable to geocode' }), null);
+  assert.equal(placeFromReverse(null), null);
 });

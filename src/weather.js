@@ -38,6 +38,12 @@ export function formatTemperature(celsius, unit = 'c') {
   return `${Math.round(value)}°${unit.toUpperCase()}`;
 }
 
+/** Wind speed in the unit system that goes with the temperature: km/h with °C, mph with °F. */
+export function formatWind(kmh, unit = 'c') {
+  if (kmh == null || Number.isNaN(kmh)) return '—';
+  return unit === 'f' ? `${Math.round(kmh * 0.621371)} mph` : `${Math.round(kmh)} km/h`;
+}
+
 /** Compass point from a bearing in degrees. */
 export function windDirection(degrees) {
   const points = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
@@ -153,11 +159,39 @@ export const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 export function forecastQuery(latitude, longitude, timezone = 'auto') {
   return `${FORECAST_URL}?${new URLSearchParams({
     latitude, longitude, timezone,
-    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day,precipitation',
+    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day,precipitation',
     hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,is_day',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,uv_index_max',
     forecast_days: '7',
   })}`;
+}
+
+// Names for a spot clicked on the map or found by the browser's location come
+// from OpenStreetMap's Nominatim.
+export const REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse';
+
+/** `detail` is Nominatim's zoom: 10 names the city, 14 the neighbourhood, so a click
+ *  on a closely zoomed map is named as closely. */
+export function reverseQuery(latitude, longitude, detail = 10) {
+  return `${REVERSE_URL}?${new URLSearchParams({
+    format: 'jsonv2', lat: latitude, lon: longitude,
+    zoom: String(Math.min(14, Math.max(8, Math.round(detail)))), 'accept-language': 'en',
+  })}`;
+}
+
+/** The place Nominatim found at a spot, shaped like a geocoding result; null over open water. */
+export function placeFromReverse(body) {
+  const a = body?.address;
+  if (!a) return null;
+  const town = a.city ?? a.town ?? a.village ?? a.hamlet ?? a.municipality;
+  const name = body.name || a.suburb || town || a.county || a.state_district || a.state || a.country;
+  if (!name) return null;
+  const place = { name };
+  // The town for a neighbourhood, otherwise the province or state.
+  const within = town && town !== name ? town : a.state;
+  if (within && within !== name) place.admin1 = within;
+  if (a.country_code) place.country_code = a.country_code.toUpperCase();
+  return place;
 }
 
 export function placeLabel(place) {
