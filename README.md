@@ -19,17 +19,23 @@ No framework, no build step, no tracking.
 
 ## Features
 
-- City search with disambiguation (three Lahores? pick the right one) and
-  "use my location" through the browser's geolocation
-- Feels-like, humidity, **dew point with a comfort level**, wind speed **and compass direction**, rain, UV with the
+- City search with disambiguation (three Lahores? pick the right one), typed
+  coordinates (`31.56, 74.35`), and "use my location" through the browser's
+  geolocation — high accuracy, named with the town it found, and a warning when
+  the browser can only place you roughly
+- Feels-like, humidity, **dew point with a comfort level**, wind speed, **gusts and compass direction**, rain, UV with the
   WHO advice band, sunrise and sunset
 - Hourly strip that starts from **now**, not from midnight, with night-time icons after dark
 - **Precipitation**: chance and amount (mm) now, for each hour and for each day
 - Seven-day forecast whose range bars share **one scale**, so days compare at a glance
-- **3D world map**: drag the globe, click anywhere for the weather at that spot; the
-  marker and coordinates show exactly where the forecast is for
+- **3D world map** of real map data: a globe with satellite imagery or an
+  OpenStreetMap street map, zoom (scroll, pinch, buttons) from the whole Earth
+  down to street level, place names at every zoom, full screen. Click anywhere,
+  or on a place name, for the weather there; the pin shows the place and its
+  temperature, and the caption the exact coordinates and the elevation the
+  forecast was made for
 - Stays current: an open tab reloads once its data is 15 minutes old, and shows when it was updated
-- °C / °F toggle, remembered along with your last place
+- °C / °F toggle (wind follows: km/h or mph), remembered along with your last place
 - Light and dark theme, and a layout that works on a phone
 
 ## What is tested
@@ -38,15 +44,15 @@ No framework, no build step, no tracking.
 Node's runner:
 
 ```bash
-node --test      # 19 tests
+node --test      # 22 tests
 ```
 
 Covering the WMO weather-code table, temperature conversion and rounding,
 compass directions across all four quadrants and negative bearings, UV bands,
 wind chill only applying when it is cold and windy, the "feels like" phrasing
 rule (in °C and °F), night icons, UV bands on the rounded index, precipitation
-amounts, range bars on a shared scale, the globe maths (a click maps back to the
-same coordinates, and turning brings a place to face you), and — the one that
+amounts, range bars on a shared scale, wind in km/h or mph, typed coordinates,
+naming a spot from OpenStreetMap at the map's zoom, and — the one that
 actually bit — the hourly list starting from the current hour rather than from
 the first hour of the day.
 
@@ -64,11 +70,16 @@ python3 -m http.server 8080
 
 - Open-Meteo is free for non-commercial use and rate-limited; the page makes one
   forecast call per place, not one per render.
-- Geolocation only runs when you press the button, and the coordinates go to
-  Open-Meteo and nowhere else.
-- The globe's coastlines and borders are Natural Earth (public domain) from the
-  `world-atlas` package on jsDelivr, drawn with three.js; without WebGL the map
-  card stays hidden and the rest of the page is unchanged.
+- Geolocation only runs when you press the button. The coordinates, rounded to
+  about 100 m, go to Open-Meteo for the forecast and to OpenStreetMap's
+  [Nominatim](https://nominatim.org/) for the town's name, and nowhere else.
+  Names for spots clicked on the map come from Nominatim too, at most one
+  lookup a second as its usage policy asks.
+- The map is [MapLibre GL JS](https://maplibre.org/) on a globe projection:
+  OpenStreetMap vector tiles from [OpenFreeMap](https://openfreemap.org/) and
+  [Sentinel-2 cloudless](https://s2maps.eu) imagery by EOX, neither needing a
+  key. If the imagery will not load the map falls back to the street view, and
+  without WebGL the map card goes away and the rest of the page is unchanged.
 - `localStorage` is wrapped in try/catch, so private mode degrades to "no saved
   place" instead of a blank page.
 
