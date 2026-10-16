@@ -1,8 +1,9 @@
 import {
   describeCode, formatTemperature, formatPrecipitation, windDirection, uvAdvice, summarise,
   dailyFromResponse, nextHours, forecastQuery, GEOCODE_URL, placeLabel, dewPoint, comfortLevel, rangeBar,
+  formatWind, reverseQuery, placeFromReverse,
 } from './weather.js';
-import { coordinateLabel } from './geo.js';
+import { coordinateLabel, parseCoordinates } from './geo.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -57,6 +58,31 @@ async function show(place) {
   state.data = data;
   state.loadedAt = Date.now();
   render();
+  if (place.unnamed) nameLater(place);
+}
+
+// A spot picked on the map, typed as coordinates or found by the browser gets a
+// name from OpenStreetMap once its forecast is showing: at most one lookup a
+// second, as Nominatim's usage policy asks, and only for the place still shown.
+let lastLookup = 0;
+let lookupTimer = 0;
+function nameLater(place) {
+  clearTimeout(lookupTimer);
+  lookupTimer = setTimeout(async () => {
+    lastLookup = Date.now();
+    try {
+      const found = placeFromReverse(await getJson(reverseQuery(place.latitude, place.longitude, place.detail)));
+      if (!found || state.place !== place) return; // open water, or the page has moved on
+      state.place = { ...place, ...found, unnamed: false };
+      save('weather:place', JSON.stringify(state.place));
+      render();
+    } catch { /* the coordinates stay as its name */ }
+  }, Math.max(0, lastLookup + 1100 - Date.now()));
+}
+
+/** A point on the map, by its coordinates until it has a name. */
+function spot(latitude, longitude, extra = {}) {
+  return { name: coordinateLabel(latitude, longitude), latitude, longitude, unnamed: true, ...extra };
 }
 
 // Open-Meteo updates current conditions every 15 minutes. A tab left open, or
@@ -93,13 +119,15 @@ function render() {
     ['Feels like', formatTemperature(current.apparent_temperature, unit)],
     ['Humidity', `${current.relative_humidity_2m}%`],
     ['Dew point', dew == null ? '—' : `${formatTemperature(dew, unit)} (${comfortLevel(dew)})`],
-    ['Wind', `${Math.round(current.wind_speed_10m)} km/h ${windDirection(current.wind_direction_10m)}`],
+    ['Wind', `${formatWind(current.wind_speed_10m, unit)} ${windDirection(current.wind_direction_10m)}${
+      current.wind_gusts_10m == null ? '' : `, gusts ${formatWind(current.wind_gusts_10m, unit)}`}`],
     ['Precipitation', `${formatPrecipitation(current.precipitation) || '0 mm'} now · ${
       formatPrecipitation(data.daily?.precipitation_sum?.[0]) || '0 mm'} today`],
     ['UV today', uvMax == null ? '—' : `${Math.round(uvMax)} (${uv.level})`],
     ['Sunrise', data.daily?.sunrise?.[0]?.slice(11, 16) ?? '—'],
     ['Sunset', data.daily?.sunset?.[0]?.slice(11, 16) ?? '—'],
-    ['Updated', current.time?.slice(11, 16) ?? '—'],
+    // Times are the place's own local time, which may not be the viewer's.
+    ['Updated', current.time ? `${current.time.slice(11, 16)} ${data.timezone_abbreviation ?? ''}`.trim() : '—'],
   ];
   $('facts').innerHTML = facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
 
@@ -134,18 +162,28 @@ function render() {
 
   for (const id of ['current', 'hourlyCard', 'dailyCard']) $(id).hidden = false;
 
-  const coords = coordinateLabel(place.latitude, place.longitude);
-  $('globeCaption').textContent = placeLabel(place) === coords ? coords : `${placeLabel(place)} · ${coords}`;
+  $('globeCaption').textContent = caption(place, data);
   if (globe) {
     $('mapCard').hidden = false;
-    globe.setPlace(place);
+    globe.setPlace(place, `${place.name} · ${formatTemperature(current.temperature_2m, unit)}`);
   }
   document.title = `${formatTemperature(current.temperature_2m, unit)} ${placeLabel(place)} — Weather Now`;
+}
+
+/** Where the forecast is for: name, coordinates, how sure the location is, and the elevation used. */
+function caption(place, data) {
+  const coords = coordinateLabel(place.latitude, place.longitude);
+  const parts = [placeLabel(place) === coords ? coords : `${placeLabel(place)} · ${coords}`];
+  if (place.accuracy) parts.push(`located to ±${place.accuracy < 1000 ? `${Math.round(place.accuracy)} m` : `${Math.round(place.accuracy / 1000)} km`}`);
+  if (Number.isFinite(data?.elevation)) parts.push(`elevation ${Math.round(data.elevation)} m`);
+  return parts.join(' · ');
 }
 
 async function runSearch(query) {
   $('error').textContent = '';
   $('suggestions').hidden = true;
+  const typed = parseCoordinates(query);
+  if (typed) return show(spot(typed.latitude, typed.longitude)).catch(fail);
   try {
     const results = await search(query);
     if (!results.length) {
@@ -170,6 +208,8 @@ async function runSearch(query) {
 
 function fail(err) {
   $('error').textContent = `${err.message} Check your connection and try again.`;
+  // A pick that failed must not leave the marker on a spot whose weather is not shown.
+  render();
 }
 
 $('searchForm').addEventListener('submit', (e) => {
@@ -195,8 +235,13 @@ $('locate').addEventListener('click', () => {
   navigator.geolocation.getCurrentPosition(
     async ({ coords }) => {
       try {
-        await show({ name: 'Your location', latitude: coords.latitude, longitude: coords.longitude });
-        $('error').textContent = '';
+        // Three decimals is about 100 m: finer than any forecast grid, and no more precise than needed.
+        const round = (value) => Math.round(value * 1000) / 1000;
+        await show(spot(round(coords.latitude), round(coords.longitude), { name: 'Your location', accuracy: coords.accuracy }));
+        // Without GPS a browser may only know the city, or less; say so rather than imply precision.
+        $('error').textContent = coords.accuracy > 5000
+          ? `Your browser could only place you to within about ${Math.round(coords.accuracy / 1000)} km. Search for your town for a closer forecast.`
+          : '';
       } catch (err) { fail(err); }
     },
     (err) => {
@@ -207,19 +252,30 @@ $('locate').addEventListener('click', () => {
       };
       $('error').textContent = messages[err.code] ?? 'Unable to determine your location.';
     },
-    { timeout: 10000 },
+    { enableHighAccuracy: true, maximumAge: 60000, timeout: 20000 },
   );
 });
 
 // The 3D map is an extra: it loads alongside the forecast, and if WebGL or the
-// CDN is missing the card stays hidden and nothing else changes.
+// CDN is missing the card goes away and nothing else changes.
+const first = state.place ?? { name: 'Lahore', admin1: 'Punjab', country_code: 'PK', latitude: 31.558, longitude: 74.35 };
+$('mapCard').hidden = false; // the map needs its size to start
 import('./globe.js')
   .then(({ createGlobe }) => createGlobe($('globe'), {
-    onPick: (latitude, longitude) => show({ name: coordinateLabel(latitude, longitude), latitude, longitude }).catch(fail),
+    center: [first.longitude, first.latitude],
+    onPick: (latitude, longitude, { name, zoom }) => {
+      // A place name on the map gives that place; anywhere else is named once its forecast is in,
+      // as closely as the map is zoomed.
+      const place = name ? { name, latitude, longitude } : spot(latitude, longitude, { detail: zoom });
+      // In the search box too, so "Copy link" shares this spot.
+      $('place').value = place.name;
+      $('globeCaption').textContent = `Loading the forecast for ${placeLabel(place)}…`;
+      globe.setPlace(place, `${place.name} · …`, false);
+      show(place).catch(fail);
+    },
   }))
   .then((created) => { globe = created; render(); })
-  .catch(() => {});
+  .catch(() => { $('mapCard').hidden = true; });
 
 // Start with the last place, or Lahore on a first visit.
-show(state.place ?? { name: 'Lahore', admin1: 'Punjab', country_code: 'PK', latitude: 31.558, longitude: 74.35 })
-  .catch(fail);
+show(first).catch(fail);
