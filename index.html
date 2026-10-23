@@ -6,10 +6,10 @@
   <title>Weather Now — Live Conditions & 7-Day Forecast</title>
   <meta property="og:type" content="website">
   <meta property="og:title" content="Weather Now — Live Conditions & 7-Day Forecast">
-  <meta property="og:description" content="Current conditions, an hourly strip and a seven-day forecast from the keyless Open-Meteo API. No API key, no tracking.">
+  <meta property="og:description" content="Current conditions, the next 24 hours, a 10-day forecast and air quality from the keyless Open-Meteo API. No API key, no tracking.">
   <meta property="og:url" content="https://umer-78.github.io/weather-now/">
   <meta name="twitter:card" content="summary">
-  <meta name="description" content="Current conditions, an hourly strip and a seven-day forecast from the keyless Open-Meteo API. No API key, no tracking.">
+  <meta name="description" content="Current conditions, the next 24 hours, a 10-day forecast and air quality from the keyless Open-Meteo API. No API key, no tracking.">
   <meta name="theme-color" content="#0284c7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0a0c10" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%230284c7'/><stop offset='1' stop-color='%236366f1'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><circle cx='13' cy='13' r='5' fill='%23fbbf24'/><path d='M9 22h14a4 4 0 000-8 6 6 0 00-11-2 4 4 0 00-3 10z' fill='white'/></svg>">
@@ -234,16 +234,6 @@
       line-height: 1.1; font-variant-numeric: tabular-nums;
     }
     .now .place { font-weight: 700; font-size: 16px; margin-top: 2px; }
-    .facts {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 12px 18px; margin: 18px 0 0; padding-top: 16px;
-      border-top: 1px solid var(--border);
-    }
-    .facts dt {
-      font-size: 11px; color: var(--muted); text-transform: uppercase;
-      letter-spacing: 0.08em; font-weight: 600;
-    }
-    .facts dd { margin: 2px 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 
     .strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin-top: 14px; }
     .hour {
@@ -265,6 +255,31 @@
     .hour .t { font-weight: 700; font-variant-numeric: tabular-nums; }
     .hour .r { font-size: 11px; color: var(--accent); font-weight: 600; }
     .hour .p { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .hour .w { margin-top: 4px; font-size: 10.5px; color: var(--text-secondary); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .arrow { display: inline-block; font-weight: 700; color: var(--accent); }
+    .day > span:first-child small.wind { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+    .range-now { margin-top: 2px; font-weight: 600; color: var(--text-secondary); white-space: pre; font-variant-numeric: tabular-nums; }
+    .outlook { margin: 16px 0 0; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--text); font-weight: 600; font-size: 14px; }
+    .updated { margin: 8px 0 0; font-size: 12px; }
+
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)); gap: 12px; margin-top: 12px; }
+    .tile { display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border); }
+    .tile h3 { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+    .tile .value { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+    .tile p { margin: auto 0 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+    .scale { position: relative; height: 6px; margin: 4px 0; border-radius: 3px; }
+    .scale.uv { background: linear-gradient(90deg, #22c55e, #eab308 30%, #f97316 55%, #ef4444 75%, #a855f7); }
+    .scale.aqi { background: linear-gradient(90deg, #22c55e, #eab308 17%, #f97316 33%, #ef4444 50%, #a855f7 67%, #7f1d1d); }
+    .scale i { position: absolute; top: 50%; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid var(--text); transform: translate(-50%, -50%); }
+    .tile svg { width: 100%; max-height: 90px; }
+    .tile svg.sun path { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; }
+    .tile svg.sun line, .tile svg.compass line { stroke: var(--border-strong); stroke-width: 1.5; }
+    .tile svg.sun circle { fill: #fbbf24; stroke: #f59e0b; stroke-width: 2; }
+    .tile svg.compass { max-height: 96px; }
+    .tile svg.compass circle { fill: none; stroke: var(--border-strong); stroke-width: 1.5; }
+    .tile svg.compass text { font: 600 10px Inter, system-ui, sans-serif; fill: var(--muted); text-anchor: middle; }
+    .tile svg.compass path { fill: var(--accent); }
+    .tile svg.compass g line { stroke: var(--accent); stroke-width: 2.5; }
 
     .days { display: grid; gap: 4px; margin-top: 12px; }
     .day {
@@ -290,7 +305,7 @@
     .day .hi { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
 
     .globe {
-      position: relative; height: clamp(260px, 56vw, 400px); margin-top: 4px;
+      position: relative; height: clamp(300px, 62vw, 460px); margin-top: 4px;
       cursor: grab; touch-action: pan-y; user-select: none;
       background: radial-gradient(circle at 50% 50%, var(--accent-glow), transparent 58%);
     }
@@ -312,6 +327,19 @@
     .globe-city::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); box-shadow: 0 0 0 1.5px var(--surface); }
     .globe-controls { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 6px; }
     .globe-controls button { width: 36px; height: 36px; padding: 0; border-radius: 10px; font-size: 18px; line-height: 1; }
+    /* Street level: the street map lies over the globe, which steps aside. */
+    .globe.deep > canvas, .globe.deep > .globe-labels, .globe.deep > .globe-controls { visibility: hidden; }
+    .globe[data-loading]::after {
+      content: "Opening the street map…"; position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+      padding: 6px 12px; border-radius: 999px; background: var(--surface); color: var(--text); font-size: 13px; font-weight: 600; box-shadow: var(--shadow-sm);
+    }
+    .streets { position: absolute; inset: 0; z-index: 2; border-radius: 12px; overflow: hidden; cursor: grab; font: inherit; }
+    .streets .streets-buttons a { font-size: 16px; line-height: 30px; text-decoration: none; }
+    .streets .streets-pin { pointer-events: none; }
+    .streets .streets-pin > div { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, calc(-100% + 7px)); }
+    .streets .streets-pin .globe-tag { margin-bottom: 8px; white-space: nowrap; }
+    .streets .streets-pin i { width: 14px; height: 14px; border-radius: 50%; background: #f97316; border: 2px solid #fff; box-shadow: 0 0 0 4px rgb(249 115 22 / 0.3), 0 1px 4px rgb(0 0 0 / 0.4); }
+    @media (prefers-color-scheme: dark) { .streets .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9); } }
     .caption { margin: 10px 0 0; font-size: 13px; text-align: center; font-variant-numeric: tabular-nums; }
 
     .muted { color: var(--muted); }
@@ -383,7 +411,7 @@ html.mk-pre header.top, html.mk-pre main section, html.mk-pre section.card, html
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Umer Hashmi · projects">
 <meta property="og:title" content="Weather Now — Live Conditions &amp; 7-Day Forecast">
-<meta property="og:description" content="Current conditions, an hourly strip and a seven-day forecast from the keyless Open-Meteo API. No API key, no tracking.">
+<meta property="og:description" content="Current conditions, the next 24 hours, a 10-day forecast and air quality from the keyless Open-Meteo API. No API key, no tracking.">
 <meta property="og:url" content="https://umer-78.github.io/weather-now/">
 <meta property="og:image" content="https://umer-78.github.io/weather-now/og.jpg">
 <meta property="og:image:alt" content="Weather Now — Live Conditions &amp; 7-Day Forecast: the live demo">
@@ -405,7 +433,7 @@ html.mk-pre header.top, html.mk-pre main section, html.mk-pre section.card, html
         <div class="icon" aria-hidden="true">W</div>
         <div>
           <h1>Weather Now</h1>
-          <p class="sub">Live conditions and a seven-day forecast — no API key, no tracking.</p>
+          <p class="sub">Live conditions, a 10-day forecast, air quality and a world map down to street level — no API key, no tracking.</p>
         </div>
       </div>
       <div class="actions">
@@ -433,29 +461,36 @@ html.mk-pre header.top, html.mk-pre main section, html.mk-pre section.card, html
           <div class="temp" id="nowTemp">—</div>
           <div class="place" id="nowPlace"></div>
           <div class="muted" id="nowSummary"></div>
+          <div class="range-now" id="nowRange"></div>
         </div>
       </div>
-      <dl class="facts" id="facts"></dl>
+      <p class="outlook" id="outlook"></p>
+      <p class="muted updated" id="updated"></p>
     </section>
 
     <section class="card" id="hourlyCard" hidden>
-      <h2>Next 12 hours</h2>
+      <h2>Next 24 hours</h2>
       <div class="strip" id="hourly"></div>
     </section>
 
     <section class="card" id="dailyCard" hidden>
-      <h2>Seven days</h2>
+      <h2>10-day forecast</h2>
       <div class="days" id="daily"></div>
+    </section>
+
+    <section class="card" id="detailsCard" hidden>
+      <h2>Right now</h2>
+      <div class="tiles" id="tiles"></div>
     </section>
 
     <section class="card" id="mapCard" hidden>
       <h2>World map</h2>
-      <p class="desc">Drag to turn the globe; scroll, pinch or use + and − to zoom, and the map stays sharp as you go in. Click or tap anywhere, or on a city's name, for the weather there.</p>
+      <p class="desc">Drag to turn the globe; scroll, pinch or use + and − to zoom. Keep going and it becomes a street map, down to single houses. Click or tap anywhere, or on a city's name, for the weather there.</p>
       <div class="globe" id="globe"></div>
       <p class="muted caption" id="globeCaption"></p>
     </section>
 
-    <footer>Forecast data from <a href="https://open-meteo.com/">Open-Meteo</a>, free for non-commercial use · Place names for map picks © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Built by <a href="https://github.com/umer-78">Umer Hashmi</a> · <a href="https://github.com/umer-78/weather-now">Source on GitHub</a></footer>
+    <footer>Forecast data from <a href="https://open-meteo.com/">Open-Meteo</a>, free for non-commercial use · Street map and place names © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Built by <a href="https://github.com/umer-78">Umer Hashmi</a> · <a href="https://github.com/umer-78/weather-now">Source on GitHub</a></footer>
   </div>
   <script type="module" src="src/app.js"></script>
 

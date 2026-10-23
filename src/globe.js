@@ -1,7 +1,9 @@
 // Interactive 3D world map: coastlines and borders from Natural Earth (via the
 // world-atlas package), a tagged marker on the place being shown and city names as
 // you zoom in. Drag to turn it; scroll, pinch, the buttons or the + and − keys to
-// zoom; click or tap anywhere, or on a city's name, for the weather there.
+// zoom; click or tap anywhere, or on a city's name, for the weather there. Zoom in
+// past the globe and it hands over to a street map (streets.js) down to single
+// houses; zoom back out of that and the globe returns.
 //
 // The whole globe is one painted texture, which would blur as you zoom in, so once
 // zoomed the stretch of the world in view is painted again at screen resolution and
@@ -12,6 +14,7 @@ import { geoEquirectangular, geoGraticule, geoGraticule10, geoPath } from 'https
 import { feature, mesh } from 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm';
 import { toSphere, fromSphere, facing, viewSpan, patchFrame } from './geo.js';
 import { CITIES } from './cities.js';
+import { createStreets } from './streets.js';
 
 const ATLAS = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/';
 const PALETTE = {
@@ -243,7 +246,7 @@ export async function createGlobe(container, { onPick }) {
   // ── Drawing ──
   function frame(now) {
     raf = 0;
-    if (lost) return;
+    if (lost || deep) return;
     // Time-based, so a slow device finishes the turn as quickly as a fast one.
     const elapsed = last ? Math.min(now - last, 250) : 16;
     last = now;
@@ -272,7 +275,49 @@ export async function createGlobe(container, { onPick }) {
     if (visible && !document.hidden && (moving || pulsing)) raf = requestAnimationFrame(frame);
     else last = 0;
   }
-  function wake() { if (!raf && !lost) raf = requestAnimationFrame(frame); }
+  function wake() { if (!raf && !lost && !deep) raf = requestAnimationFrame(frame); }
+
+  // ── Street level: past the globe's last zoom, the street map takes over ──
+  let deep = false;
+  let streets = null;
+  let streetsFailed = false;
+  let label = '';
+  /** How closely the globe is looked at, on web maps' zoom scale (the whole world is about 2). */
+  const webZoom = () => Math.log2((container.clientHeight * zoom.now * 2 * Math.PI)
+    / (2 * (camera.position.z - 1) * Math.tan((camera.fov * RAD) / 2) * 256));
+  async function deeper(at) {
+    if (deep || streetsFailed || container.dataset.loading != null) return;
+    const spot = (at && surfaceAt(...at)) || surfaceAt(container.clientWidth / 2, container.clientHeight / 2);
+    if (!spot) return;
+    container.dataset.loading = '';
+    try {
+      streets ??= await createStreets(container, {
+        onPick: (latitude, longitude, how) => onPick(latitude, longitude, how),
+        onLeave: ({ lat, lng }) => leave(lat, lng),
+      });
+    } catch {
+      streetsFailed = true; // the globe carries on as it was
+      return;
+    } finally {
+      delete container.dataset.loading;
+    }
+    deep = true;
+    container.classList.add('deep');
+    if (shown) streets.setPlace(shown, label, false);
+    streets.show(spot.lat, spot.lon, Math.max(7, Math.round(webZoom()) + 1));
+  }
+  function leave(latitude, longitude) {
+    streets.hide();
+    container.classList.remove('deep');
+    deep = false;
+    // Back on the globe where the street map was, zoomed in, without a turn to watch.
+    Object.assign(target, towards(latitude, longitude));
+    globe.rotation.set(target.x, target.y, 0);
+    zoom.now = zoom.target = ZOOM_MAX * 0.7;
+    el.style.touchAction = 'none';
+    sharpenSoon();
+    wake();
+  }
 
   function fit() {
     const width = container.clientWidth;
@@ -293,7 +338,14 @@ export async function createGlobe(container, { onPick }) {
   addEventListener('fx:theme', repaint);
   addEventListener('fx:motion', wake);
   // A phone may take the GPU back under memory pressure; wait, then draw again rather than break.
-  el.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost = true; cancelAnimationFrame(raf); raf = 0; });
+  el.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    lost = true;
+    cancelAnimationFrame(raf);
+    raf = 0;
+    // Its GPU copy went with the context: let it go without disposing into the new one.
+    if (patch) { globe.remove(patch); patch = null; }
+  });
   // three.js uploads everything again by itself; the sharp view is simply repainted.
   el.addEventListener('webglcontextrestored', () => { lost = false; sharpenSoon(); wake(); });
 
@@ -321,6 +373,7 @@ export async function createGlobe(container, { onPick }) {
 
   /** Zoom by a factor; zooming in at a point turns the globe so that point stays put. False at the limit. */
   function zoomBy(factor, at) {
+    if (factor > 1 && zoom.target >= ZOOM_MAX - 1e-6) { deeper(at); return true; }
     const next = clamp(zoom.target * factor, 1, ZOOM_MAX);
     if (Math.abs(next - zoom.target) < 1e-6) return false;
     const spot = next > zoom.target && at ? surfaceAt(...at) : null;
@@ -422,7 +475,7 @@ export async function createGlobe(container, { onPick }) {
     // A city's name, or near enough to its dot, gives that city by name.
     const city = cities.find(({ box }) => box && x >= box.left - 6 && x <= box.right && y >= box.top - 4 && y <= box.bottom + 4);
     // How closely the map is looked at, on the scale web maps use: the whole globe is about 2.
-    const detail = 2 + Math.log2(zoom.now) * 1.5 + 6;
+    const detail = webZoom();
     if (city) {
       onPick(city.latitude, city.longitude, { name: city.name, country_code: city.country_code, detail });
       return;
@@ -433,8 +486,10 @@ export async function createGlobe(container, { onPick }) {
 
   return {
     /** Put the marker, tagged with `label`, on a place and turn the globe to face it. */
-    setPlace({ latitude, longitude }, label = '') {
-      if (tag.textContent !== label) { tag.textContent = label; tagWidth = 0; }
+    setPlace({ latitude, longitude }, text = '', follow = true) {
+      label = text;
+      if (tag.textContent !== text) { tag.textContent = text; tagWidth = 0; }
+      streets?.setPlace({ latitude, longitude }, text, follow);
       if (!shown || shown.latitude !== latitude || shown.longitude !== longitude) {
         shown = { latitude, longitude };
         const p = toSphere(latitude, longitude, 1.004);
