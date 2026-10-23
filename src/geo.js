@@ -30,9 +30,9 @@ export function facing(lat, lon) {
   return { x: lat * RAD, y: -Math.atan2(x, z) };
 }
 
-/** "31.56°N, 74.35°E" */
-export function coordinateLabel(lat, lon) {
-  const part = (value, positive, negative) => `${Math.abs(value).toFixed(2)}°${value < 0 ? negative : positive}`;
+/** "31.56°N, 74.35°E"; four digits is about 10 m. */
+export function coordinateLabel(lat, lon, digits = 2) {
+  const part = (value, positive, negative) => `${Math.abs(value).toFixed(digits)}°${value < 0 ? negative : positive}`;
   return `${part(lat, 'N', 'S')}, ${part(lon, 'E', 'W')}`;
 }
 

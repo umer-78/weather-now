@@ -1,7 +1,8 @@
 import {
   describeCode, formatTemperature, formatPrecipitation, windDirection, uvAdvice, summarise,
   dailyFromResponse, nextHours, forecastQuery, GEOCODE_URL, placeLabel, dewPoint, comfortLevel, rangeBar,
-  formatWind, reverseQuery, placeFromReverse,
+  formatWind, reverseQuery, placeFromReverse, formatDistance, rainOutlook, outlookText,
+  airQuery, aqiLevel, moonPhase, pressureTrend, visibilityNote, feelsNote, sunProgress,
 } from './weather.js';
 import { coordinateLabel, parseCoordinates } from './geo.js';
 
@@ -12,6 +13,7 @@ const state = {
   unit: load('weather:unit') || 'c',
   place: JSON.parse(load('weather:place') || 'null'),
   data: null,
+  air: null,
   loadedAt: 0,
 };
 let globe = null;
@@ -48,7 +50,11 @@ let latestRequest = 0;
 async function show(place) {
   const request = ++latestRequest;
   $('error').textContent = '';
-  const data = await getJson(forecastQuery(place.latitude, place.longitude));
+  // Air quality is a separate service; without it the page simply has no air tile.
+  const [data, air] = await Promise.all([
+    getJson(forecastQuery(place.latitude, place.longitude)),
+    getJson(airQuery(place.latitude, place.longitude)).catch(() => null),
+  ]);
   // Answers can arrive out of order; a slow earlier one must not replace the place asked for last.
   if (request !== latestRequest) return;
 
@@ -56,6 +62,7 @@ async function show(place) {
   state.place = place;
   save('weather:place', JSON.stringify(place));
   state.data = data;
+  state.air = air?.current ?? null;
   state.loadedAt = Date.now();
   render();
   if (place.unnamed) nameLater(place);
@@ -106,41 +113,28 @@ function render() {
   const { data, place, unit } = state;
   if (!data) return;
   const current = data.current;
+  const days = dailyFromResponse(data.daily);
   const { icon } = describeCode(current.weather_code, current.is_day);
   $('nowIcon').textContent = icon;
   $('nowTemp').textContent = formatTemperature(current.temperature_2m, unit);
   $('nowPlace').textContent = placeLabel(place);
   $('nowSummary').textContent = summarise(current, unit);
+  $('nowRange').textContent = days[0] ? `H: ${formatTemperature(days[0].max, unit)}  L: ${formatTemperature(days[0].min, unit)}` : '';
+  const outlook = rainOutlook(data.hourly, current.time);
+  $('outlook').textContent = `${outlook.next ? '☔' : '🌤️'} ${outlookText(outlook)}`;
+  // Times are the place's own local time, which may not be the viewer's.
+  $('updated').textContent = current.time ? `Updated ${current.time.slice(11, 16)} ${data.timezone_abbreviation ?? ''} local time` : '';
 
-  const uvMax = data.daily?.uv_index_max?.[0];
-  const uv = uvAdvice(uvMax);
-  const dew = dewPoint(current.temperature_2m, current.relative_humidity_2m);
-  const facts = [
-    ['Feels like', formatTemperature(current.apparent_temperature, unit)],
-    ['Humidity', `${current.relative_humidity_2m}%`],
-    ['Dew point', dew == null ? '—' : `${formatTemperature(dew, unit)} (${comfortLevel(dew)})`],
-    ['Wind', `${formatWind(current.wind_speed_10m, unit)} ${windDirection(current.wind_direction_10m)}${
-      current.wind_gusts_10m == null ? '' : `, gusts ${formatWind(current.wind_gusts_10m, unit)}`}`],
-    ['Precipitation', `${formatPrecipitation(current.precipitation) || '0 mm'} now · ${
-      formatPrecipitation(data.daily?.precipitation_sum?.[0]) || '0 mm'} today`],
-    ['UV today', uvMax == null ? '—' : `${Math.round(uvMax)} (${uv.level})`],
-    ['Sunrise', data.daily?.sunrise?.[0]?.slice(11, 16) ?? '—'],
-    ['Sunset', data.daily?.sunset?.[0]?.slice(11, 16) ?? '—'],
-    // Times are the place's own local time, which may not be the viewer's.
-    ['Updated', current.time ? `${current.time.slice(11, 16)} ${data.timezone_abbreviation ?? ''}`.trim() : '—'],
-  ];
-  $('facts').innerHTML = facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
-
-  $('hourly').innerHTML = nextHours(data.hourly, data.current?.time).map((hour) => `
+  $('hourly').innerHTML = nextHours(data.hourly, current.time, 24).map((hour) => `
     <div class="hour">
       <div class="h">${esc(hour.label)}</div>
       <div class="i">${describeCode(hour.code, hour.isDay).icon}</div>
       <div class="t">${formatTemperature(hour.temperature, unit)}</div>
       <div class="r">${hour.rainChance ? `${hour.rainChance}%` : ''}</div>
       <div class="p">${formatPrecipitation(hour.precipitation)}</div>
+      ${hour.wind == null ? '' : `<div class="w" title="Wind from ${windDirection(hour.windDirection)}">${arrow(hour.windDirection)} ${esc(formatWind(hour.wind, unit))}</div>`}
     </div>`).join('');
 
-  const days = dailyFromResponse(data.daily);
   const coldest = Math.min(...days.map((d) => d.min));
   const hottest = Math.max(...days.map((d) => d.max));
   $('daily').innerHTML = days.map((day, i) => {
@@ -148,7 +142,8 @@ function render() {
     const { left, right } = rangeBar(day.min, day.max, coldest, hottest);
     return `
     <div class="day">
-      <span>${i === 0 ? 'Today' : esc(day.weekday)}</span>
+      <span>${i === 0 ? 'Today' : esc(day.weekday)}${day.wind == null ? '' : `<small class="wind" title="Strongest wind${
+        day.gusts == null ? '' : `, gusts to ${esc(formatWind(day.gusts, unit))}`}">${arrow(day.windDirection)} ${esc(formatWind(day.wind, unit))}</small>`}</span>
       <span class="ic" title="${esc(describeCode(day.code).text)}">${describeCode(day.code).icon}${
         day.rainChance ? `<small>${day.rainChance}%<span class="sr-only"> chance of precipitation</span></small>` : ''}${
         formatPrecipitation(day.precipitation) ? `<small class="mm">${formatPrecipitation(day.precipitation)}</small>` : ''}</span>
@@ -160,20 +155,103 @@ function render() {
     </div>`;
   }).join('');
 
-  for (const id of ['current', 'hourlyCard', 'dailyCard']) $(id).hidden = false;
+  $('tiles').innerHTML = tiles(data, days, outlook, unit);
+  for (const id of ['current', 'hourlyCard', 'dailyCard', 'detailsCard']) $(id).hidden = false;
 
   $('globeCaption').textContent = caption(place, data);
   if (globe) {
     $('mapCard').hidden = false;
-    globe.setPlace(place, `${place.name} · ${formatTemperature(current.temperature_2m, unit)}`);
+    globe.setPlace(place, `${icon} ${place.name} · ${formatTemperature(current.temperature_2m, unit)}`);
   }
   document.title = `${formatTemperature(current.temperature_2m, unit)} ${placeLabel(place)} — Weather Now`;
 }
 
+/** A small arrow pointing the way the wind blows (it is named for where it comes from). */
+function arrow(degrees) {
+  return degrees == null ? '' : `<span class="arrow" style="transform:rotate(${Math.round(degrees) + 180}deg)" aria-hidden="true">↑</span>`;
+}
+
+/** One detail tile: a title, the figure, and an optional picture and note. */
+function tile(icon, title, value, note = '', picture = '') {
+  return `<article class="tile"><h3><span aria-hidden="true">${icon}</span> ${esc(title)}</h3>
+    <div class="value">${esc(value)}</div>${picture}${note ? `<p>${esc(note)}</p>` : ''}</article>`;
+}
+
+/** The detail tiles, as on a phone's weather app: each figure with what it means. */
+function tiles(data, days, outlook, unit) {
+  const current = data.current;
+  const today = days[0] ?? {};
+  const out = [];
+
+  // Air quality, when the air service answered.
+  const aqi = state.air?.us_aqi;
+  const air = aqiLevel(aqi);
+  if (air) {
+    out.push(tile('🫁', 'Air quality', `${Math.round(aqi)} · ${air.level}`, `${air.advice}${
+      state.air.pm2_5 == null ? '' : ` PM2.5 ${Math.round(state.air.pm2_5)} µg/m³.`}`,
+    `<div class="scale aqi"><i style="left:${Math.min(100, (aqi / 300) * 100)}%"></i></div>`));
+  }
+
+  const uvMax = data.daily?.uv_index_max?.[0];
+  if (uvMax != null) {
+    const uv = uvAdvice(uvMax);
+    out.push(tile('☀️', 'UV index', `${Math.round(uvMax)} · ${uv.level[0].toUpperCase()}${uv.level.slice(1)}`, `Today's peak. ${uv.advice}`,
+      `<div class="scale uv"><i style="left:${Math.min(100, (uvMax / 11) * 100)}%"></i></div>`));
+  }
+
+  const rise = data.daily?.sunrise?.[0];
+  const set = data.daily?.sunset?.[0];
+  if (rise && set) {
+    const progress = sunProgress(current.time, rise, set);
+    const before = current.time < rise;
+    const next = progress != null ? ['Sunset', set] : before ? ['Sunrise', rise] : ['Sunrise', data.daily.sunrise[1] ?? rise];
+    const x = 10 + (progress ?? (before ? 0 : 1)) * 140;
+    const y = 70 - Math.sin(Math.PI * (progress ?? 0)) * 55;
+    out.push(tile(progress != null ? '🌇' : '🌅', next[0], next[1].slice(11, 16),
+      next[0] === 'Sunset' ? `Sunrise was ${rise.slice(11, 16)}.` : `Sunset ${set.slice(11, 16)}.`,
+      `<svg class="sun" viewBox="0 0 160 80" aria-hidden="true"><path d="M10 70 Q80 -40 150 70" /><line x1="0" y1="70" x2="160" y2="70" />${
+        progress == null ? '' : `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" />`}</svg>`));
+  }
+
+  const dir = current.wind_direction_10m;
+  out.push(tile('💨', 'Wind', formatWind(current.wind_speed_10m, unit),
+    `From the ${windDirection(dir)}${current.wind_gusts_10m == null ? '' : `, gusts to ${formatWind(current.wind_gusts_10m, unit)}`}.${
+      today.gusts == null ? '' : ` Today's strongest gust ${formatWind(today.gusts, unit)}.`}`,
+    dir == null ? '' : `<svg class="compass" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" />
+      <text x="50" y="16">N</text><text x="88" y="54">E</text><text x="50" y="92">S</text><text x="12" y="54">W</text>
+      <g transform="rotate(${Math.round(dir) + 180} 50 50)"><path d="M50 18 L58 34 L50 30 L42 34 Z" /><line x1="50" y1="30" x2="50" y2="82" /></g></svg>`));
+
+  out.push(tile('☔', 'Precipitation', `${formatPrecipitation(current.precipitation) || '0 mm'} now`,
+    `${today.precipitation ? `${formatPrecipitation(today.precipitation)} expected today. ` : ''}${
+      outlook.chance == null ? '' : `${outlook.chance}% chance this hour. `}${outlookText(outlook)}`));
+
+  out.push(tile('🌡️', 'Feels like', formatTemperature(current.apparent_temperature, unit), feelsNote(current)));
+
+  const dew = dewPoint(current.temperature_2m, current.relative_humidity_2m);
+  out.push(tile('💧', 'Humidity', `${current.relative_humidity_2m}%`,
+    dew == null ? '' : `The dew point is ${formatTemperature(dew, unit)}: ${comfortLevel(dew)}.`));
+
+  if (current.visibility != null) {
+    out.push(tile('👁️', 'Visibility', formatDistance(current.visibility, unit), visibilityNote(current.visibility)));
+  }
+  if (current.pressure_msl != null) {
+    const trend = pressureTrend(data.hourly, current.time);
+    out.push(tile('🧭', 'Pressure', `${Math.round(current.pressure_msl)} hPa`, trend ? `${trend} over the next three hours.` : ''));
+  }
+  if (current.cloud_cover != null) {
+    const c = current.cloud_cover;
+    out.push(tile('☁️', 'Cloud cover', `${Math.round(c)}%`, c < 20 ? 'Mostly clear skies.' : c < 60 ? 'Some cloud about.' : c < 90 ? 'Mostly cloudy.' : 'Overcast.'));
+  }
+
+  const moon = moonPhase(new Date());
+  out.push(tile(moon.icon, 'Moon', moon.name, `${moon.lit}% lit.`));
+  return out.join('');
+}
+
 /** Where the forecast is for: name, coordinates, how sure the location is, and the elevation used. */
 function caption(place, data) {
-  const coords = coordinateLabel(place.latitude, place.longitude);
-  const parts = [placeLabel(place) === coords ? coords : `${placeLabel(place)} · ${coords}`];
+  const coords = coordinateLabel(place.latitude, place.longitude, 4);
+  const parts = [place.unnamed && place.name === coordinateLabel(place.latitude, place.longitude) ? coords : `${placeLabel(place)} · ${coords}`];
   if (place.accuracy) parts.push(`located to ±${place.accuracy < 1000 ? `${Math.round(place.accuracy)} m` : `${Math.round(place.accuracy / 1000)} km`}`);
   if (Number.isFinite(data?.elevation)) parts.push(`elevation ${Math.round(data.elevation)} m`);
   return parts.join(' · ');
@@ -264,10 +342,10 @@ import('./globe.js')
       // A city's name on the globe gives that city; anywhere else is named once its
       // forecast is in, as closely as the globe is zoomed.
       const place = name ? { name, country_code, latitude, longitude } : spot(latitude, longitude, { detail });
-      // In the search box too, so "Copy link" shares this spot.
-      $('place').value = place.name;
+      // In the search box too, to four places (about 10 m), so "Copy link" shares this very spot.
+      $('place').value = name ?? coordinateLabel(latitude, longitude, 4);
       $('globeCaption').textContent = `Loading the forecast for ${placeLabel(place)}…`;
-      globe.setPlace(place, `${place.name} · …`);
+      globe.setPlace(place, `${place.name} · …`, false);
       show(place).catch(fail);
     },
   }))
