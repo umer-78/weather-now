@@ -1,169 +1,449 @@
-// The world map: a 3D globe of real map data, like an online earth viewer. MapLibre GL JS
-// draws OpenStreetMap (roads, towns and their names, down to street level, from
-// OpenFreeMap) or Sentinel-2 satellite imagery with borders and place names over it.
-// Zoom with the scroll wheel, a pinch or the buttons; click anywhere, or on a place
-// name, for the weather there. app.js loads this on demand, so without WebGL or the
-// CDN the page simply works without a map.
-const LIBRARY = 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/';
-const STYLE = 'https://tiles.openfreemap.org/styles/liberty';
-const SATELLITE = {
-  type: 'raster',
-  tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg'],
-  tileSize: 256,
-  maxzoom: 14, // 10 m imagery; closer in it is enlarged
-  attribution: '<a href="https://s2maps.eu" target="_blank" rel="noopener">Sentinel-2 cloudless</a> by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2024)',
+// Interactive 3D world map: coastlines and borders from Natural Earth (via the
+// world-atlas package), a tagged marker on the place being shown and city names as
+// you zoom in. Drag to turn it; scroll, pinch, the buttons or the + and − keys to
+// zoom; click or tap anywhere, or on a city's name, for the weather there.
+//
+// The whole globe is one painted texture, which would blur as you zoom in, so once
+// zoomed the stretch of the world in view is painted again at screen resolution and
+// laid over the globe: the map stays sharp at every zoom. app.js loads this on
+// demand, so without WebGL or the CDN the page simply works without a map.
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.min.js';
+import { geoEquirectangular, geoGraticule, geoGraticule10, geoPath } from 'https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/+esm';
+import { feature, mesh } from 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm';
+import { toSphere, fromSphere, facing, viewSpan, patchFrame } from './geo.js';
+import { CITIES } from './cities.js';
+
+const ATLAS = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/';
+const PALETTE = {
+  light: { ocean: '#cfe6f5', land: '#fbfcfd', border: '#aebccc', grid: 'rgba(2, 132, 199, 0.16)' },
+  dark: { ocean: '#11283d', land: '#3b485e', border: '#63708a', grid: 'rgba(56, 189, 248, 0.16)' },
 };
-// Over the imagery: borders, water and place names, but not road names floating over hidden roads.
-const HIDDEN_ON_SATELLITE = new Set(['poi', 'transportation_name']);
-const BROAD = new Set(['continent', 'country', 'state', 'province']);
+const MARKER = 0xf97316;
+const TILT_LIMIT = 1.3; // radians; keeps the poles from flipping over
+const ZOOM_MAX = 12;
+const SHARP_FROM = 1.6; // zoom from which the view in front is repainted at screen resolution
+const FINE_FROM = 2.5; // zoom from which the finer 1:50m coastlines are fetched
+const CITY_ZOOM = { 1: 1.6, 2: 3 }; // zoom at which each tier of city names appears
+const RAD = Math.PI / 180;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-function load(tag, attributes) {
-  return new Promise((resolve, reject) => {
-    const node = Object.assign(document.createElement(tag), attributes);
-    node.onload = resolve;
-    node.onerror = () => reject(new Error('The map library did not load.'));
-    document.head.append(node);
-  });
+async function atlas(file) {
+  const response = await fetch(ATLAS + file);
+  if (!response.ok) throw new Error(`Map data answered ${response.status}.`);
+  const world = await response.json();
+  return { land: feature(world, world.objects.land), borders: mesh(world, world.objects.countries, (a, b) => a !== b) };
 }
 
-async function library() {
-  if (!window.maplibregl) {
-    await Promise.all([
-      load('link', { rel: 'stylesheet', href: `${LIBRARY}maplibre-gl.css` }),
-      load('script', { src: `${LIBRARY}maplibre-gl.js` }),
-    ]);
-  }
-  if (!window.maplibregl) throw new Error('The map library did not load.');
-  return window.maplibregl;
+/** Ocean, graticule, land and borders, drawn through `projection` onto a canvas. */
+function draw(canvas, projection, map, colours, line, grid) {
+  const ctx = canvas.getContext('2d');
+  const path = geoPath(projection, ctx);
+  ctx.fillStyle = colours.ocean;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.lineWidth = line;
+  ctx.lineJoin = 'round';
+  ctx.beginPath(); path(grid); ctx.strokeStyle = colours.grid; ctx.stroke();
+  ctx.beginPath(); path(map.land); ctx.fillStyle = colours.land; ctx.fill();
+  ctx.beginPath(); path(map.borders); ctx.strokeStyle = colours.border; ctx.stroke();
 }
 
-function read(key) { try { return localStorage.getItem(key); } catch { return null; } }
-function write(key, value) { try { localStorage.setItem(key, value); } catch { /* private mode */ } }
+export async function createGlobe(container, { onPick }) {
+  let map = await atlas('countries-110m.json');
 
-/** Great-circle distance in degrees. */
-function apart([lon1, lat1], [lon2, lat2]) {
-  const r = Math.PI / 180;
-  const a = Math.sin(((lat2 - lat1) * r) / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(((lon2 - lon1) * r) / 2) ** 2;
-  return (2 * Math.asin(Math.min(1, Math.sqrt(a)))) / r;
-}
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const el = renderer.domElement;
+  el.tabIndex = 0;
+  el.setAttribute('role', 'application');
+  el.setAttribute('aria-label', 'World map. Arrow keys turn it, plus and minus zoom.');
+  container.append(el);
 
-export async function createGlobe(container, { onPick, center = [74.35, 31.56] }) {
-  const maplibregl = await library();
-  const map = new maplibregl.Map({
-    container,
-    style: STYLE,
-    center,
-    // The whole globe in view to start, on a phone as on a wide screen.
-    zoom: Math.min(2.6, Math.max(1, Math.log2((Math.min(container.clientWidth, container.clientHeight) * 1.6 * Math.PI) / 512) || 2)),
-    attributionControl: { compact: true },
-    // On a phone one finger keeps scrolling the page and two move the map, as embedded maps do.
-    cooperativeGestures: matchMedia('(pointer: coarse)').matches,
-  });
-  await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('The map took too long to load.')), 20000);
-    map.once('load', () => { clearTimeout(timer); resolve(); });
-  });
-
-  let view = read('weather:mapView') === 'map' ? 'map' : 'satellite';
-  let satelliteFailures = 0;
-
-  function dress() {
-    map.setProjection({ type: 'globe' });
-    if (!map.getSource('satellite')) {
-      map.addSource('satellite', SATELLITE);
-      const layers = map.getStyle().layers;
-      const above = layers.find((l) => l['source-layer'] === 'boundary') ?? layers.find((l) => l.type === 'symbol');
-      map.addLayer({ id: 'satellite', type: 'raster', source: 'satellite', paint: { 'raster-fade-duration': 200 } }, above?.id);
-    }
-    show(view);
+  // The whole world, drawn flat (equirectangular) and wrapped round the sphere.
+  const canvas = document.createElement('canvas');
+  canvas.width = 2048;
+  canvas.height = 1024;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const root = document.documentElement;
+  const darkScheme = matchMedia('(prefers-color-scheme: dark)');
+  // The page's theme button sets data-theme; without it, follow the system.
+  const colours = () => PALETTE[(root.dataset.theme ? root.dataset.theme === 'dark' : darkScheme.matches) ? 'dark' : 'light'];
+  function paint() {
+    draw(canvas, geoEquirectangular().fitSize([canvas.width, canvas.height], { type: 'Sphere' }), map, colours(), 1.5, geoGraticule10());
+    texture.needsUpdate = true;
   }
+  paint();
 
-  function show(next, chosen = true) {
-    view = next;
-    const satellite = view === 'satellite';
-    map.setLayoutProperty('satellite', 'visibility', satellite ? 'visible' : 'none');
-    for (const layer of map.getStyle().layers) {
-      if (HIDDEN_ON_SATELLITE.has(layer['source-layer'])) {
-        map.setLayoutProperty(layer.id, 'visibility', satellite ? 'none' : 'visible');
-      }
-    }
-    for (const button of switcher.querySelectorAll('button')) button.setAttribute('aria-pressed', String(button.dataset.view === view));
-    if (chosen) write('weather:mapView', view);
-  }
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+  scene.add(new THREE.AmbientLight(0xffffff, 2.1));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+  sun.position.set(-3, 2, 4);
+  scene.add(sun);
 
-  // Satellite / Map switch, and a button back to the place being shown.
-  const switcher = document.createElement('div');
-  switcher.className = 'maplibregl-ctrl maplibregl-ctrl-group globe-views';
-  switcher.innerHTML = '<button type="button" data-view="satellite">Satellite</button><button type="button" data-view="map">Map</button>';
-  switcher.addEventListener('click', (e) => {
-    const next = e.target.closest('button')?.dataset.view;
-    if (next && next !== view) show(next);
+  const material = new THREE.MeshLambertMaterial({ map: texture });
+  const globe = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), material);
+  globe.rotation.set(0.35, 0, 0);
+  scene.add(globe);
+
+  const marker = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.03, 0.042, 48),
+    new THREE.MeshBasicMaterial({ color: MARKER, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+  marker.add(new THREE.Mesh(new THREE.SphereGeometry(0.022, 16, 12), new THREE.MeshBasicMaterial({ color: MARKER })), ring);
+  marker.visible = false;
+  globe.add(marker);
+
+  // Names sit in HTML over the canvas, so they stay crisp at any zoom.
+  const overlay = document.createElement('div');
+  overlay.className = 'globe-labels';
+  overlay.setAttribute('aria-hidden', 'true');
+  const tag = document.createElement('div');
+  tag.className = 'globe-tag';
+  tag.hidden = true;
+  const cities = CITIES.map((city) => {
+    const label = document.createElement('div');
+    label.className = 'globe-city';
+    label.textContent = city.name;
+    label.hidden = true;
+    overlay.append(label);
+    return { ...city, label, point: toSphere(city.latitude, city.longitude), box: null };
   });
-  const home = document.createElement('div');
-  home.className = 'maplibregl-ctrl maplibregl-ctrl-group';
-  home.innerHTML = '<button type="button" class="globe-home" aria-label="Back to the place shown" title="Back to the place shown">◎</button>';
-  home.addEventListener('click', () => {
-    if (shown) map.flyTo({ center: shown, zoom: Math.max(map.getZoom(), 9), essential: true });
-  });
-  const control = (node) => ({ onAdd: () => node, onRemove: () => node.remove() });
+  overlay.append(tag);
+  container.append(overlay);
 
-  map.addControl(control(switcher), 'top-left');
-  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
-  map.addControl(control(home), 'top-right');
-  map.addControl(new maplibregl.FullscreenControl(), 'top-right');
-  map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
-  dress();
+  const controls = document.createElement('div');
+  controls.className = 'globe-controls';
+  controls.innerHTML = `
+    <button type="button" data-zoom="in" aria-label="Zoom in" title="Zoom in">+</button>
+    <button type="button" data-zoom="out" aria-label="Zoom out" title="Zoom out">−</button>
+    <button type="button" data-zoom="home" aria-label="Back to the place shown" title="Back to the place shown">◎</button>`;
+  container.append(controls);
 
-  // Imagery that will not load (the service down, or blocked) gives way to the street map.
-  map.on('error', (e) => {
-    if (e.sourceId === 'satellite' && view === 'satellite' && ++satelliteFailures >= 4) show('map', false);
-  });
-
-  // The marker: a pin with the place's name and temperature.
-  const pin = document.createElement('div');
-  pin.className = 'globe-pin';
-  pin.innerHTML = '<span class="globe-tag"></span><span class="globe-dot" aria-hidden="true"></span>';
-  const tag = pin.querySelector('.globe-tag');
-  const marker = new maplibregl.Marker({ element: pin, anchor: 'bottom' });
+  const target = { x: globe.rotation.x, y: globe.rotation.y };
+  const zoom = { now: 1, target: 1 };
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const still = () => reduce || root.classList.contains('fx-still'); // the page's pause-motion button
+  let raf = 0;
+  let last = 0;
+  let visible = true;
+  let lost = false;
   let shown = null;
+  let wasMoving = false;
 
-  // A double click zooms; only a single click picks a spot.
-  let pending = 0;
-  map.on('dblclick', () => clearTimeout(pending));
-  map.on('click', (e) => {
-    clearTimeout(pending);
-    pending = setTimeout(() => {
-      const places = map.getStyle().layers.filter((l) => l.type === 'symbol' && l['source-layer'] === 'place').map((l) => l.id);
-      const [label] = places.length ? map.queryRenderedFeatures(e.point, { layers: places }) : [];
-      const zoom = map.getZoom();
-      // Towns and neighbourhoods by name; a country's or state's label is just a spot within it.
-      if (label?.geometry?.type === 'Point' && !BROAD.has(label.properties.class)) {
-        const p = label.properties;
-        const [longitude, latitude] = label.geometry.coordinates.map((value) => Math.round(value * 1e4) / 1e4);
-        onPick(latitude, longitude, { name: p['name:en'] ?? p.name_en ?? p['name:latin'] ?? p.name, zoom });
-        return;
+  // ── The sharp view: the stretch of the world in front, painted at screen resolution ──
+  let fine = 'coarse';
+  let patch = null;
+  let sharpTimer = 0;
+  function sharpenSoon() { clearTimeout(sharpTimer); sharpTimer = setTimeout(sharpen, 120); }
+  function dropPatch() {
+    if (!patch) return;
+    globe.remove(patch);
+    patch.geometry.dispose();
+    patch.material.map.dispose();
+    patch.material.dispose();
+    patch = null;
+  }
+  function sharpen() {
+    if (lost || zoom.now < SHARP_FROM) { dropPatch(); return; }
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const center = surfaceAt(width / 2, height / 2);
+    if (!width || !height || !center) { dropPatch(); return; }
+    const samples = [];
+    for (let i = 0; i <= 8; i++) {
+      for (let j = 0; j <= 8; j++) {
+        const spot = surfaceAt((width * i) / 8, (height * j) / 8);
+        if (spot) samples.push(spot);
       }
-      const round = (value) => Math.round(value * 1e4) / 1e4;
-      onPick(round(e.lngLat.lat), round(e.lngLat.lng), { zoom });
-    }, 250);
+    }
+    const span = viewSpan(center, samples);
+    // About one texel per screen pixel over the view and its margin, within what any GPU takes.
+    const ratio = renderer.getPixelRatio();
+    const size = Math.min(2048, renderer.capabilities.maxTextureSize);
+    const sheet = document.createElement('canvas');
+    sheet.width = clamp(Math.round(width * ratio * 1.6), 256, size);
+    sheet.height = clamp(Math.round(height * ratio * 1.6), 256, size);
+    const frame = patchFrame(span, sheet.width, sheet.height);
+    const flat = geoEquirectangular().rotate([-span.lonC, 0]).scale(1).translate([0, 0])
+      .clipExtent([[span.lon0 * RAD - 0.01, -span.lat1 * RAD - 0.01], [span.lon1 * RAD + 0.01, -span.lat0 * RAD + 0.01]]);
+    const projection = {
+      stream: (out) => flat.stream({
+        point: (x, y) => { const [px, py] = frame.toPixel(x, y); out.point(px, py); },
+        lineStart: () => out.lineStart(),
+        lineEnd: () => out.lineEnd(),
+        polygonStart: () => out.polygonStart(),
+        polygonEnd: () => out.polygonEnd(),
+        sphere: () => {},
+      }),
+    };
+    const step = zoom.now >= 6 ? 1 : zoom.now >= 3 ? 5 : 10;
+    draw(sheet, projection, map, colours(), 1.4 * ratio, geoGraticule().step([step, step]).precision(1)());
+
+    const sharp = new THREE.CanvasTexture(sheet);
+    sharp.colorSpace = THREE.SRGBColorSpace;
+    sharp.generateMipmaps = false; // drawn for this zoom, so it is never shrunk far
+    sharp.minFilter = THREE.LinearFilter;
+    const segments = (degrees) => clamp(Math.ceil(degrees / 1.5), 6, 120); // follows the curve, not a chord under it
+    const shape = new THREE.SphereGeometry(1.0006, segments(span.lon1 - span.lon0), segments(span.lat1 - span.lat0),
+      frame.phiStart, frame.phiLength, frame.thetaStart, frame.thetaLength);
+    dropPatch();
+    patch = new THREE.Mesh(shape, new THREE.MeshLambertMaterial({ map: sharp, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+    globe.add(patch);
+    wake();
+  }
+  function finer() {
+    if (fine !== 'coarse' || zoom.target < FINE_FROM) return;
+    fine = 'loading';
+    atlas('countries-50m.json')
+      .then((detail) => { map = detail; fine = 'fine'; paint(); sharpenSoon(); })
+      .catch(() => { fine = 'failed'; }); // the coarse map stays; no retry storm
+  }
+
+  // ── Labels ──
+  const v = new THREE.Vector3();
+  function project(point) {
+    v.set(point.x, point.y, point.z).applyMatrix4(globe.matrixWorld);
+    // A point on the unit sphere faces a camera at distance d when its z is above 1/d;
+    // a margin keeps names off the crowded rim.
+    if (v.z < 1 / camera.position.z + 0.08) return null;
+    v.project(camera);
+    const x = ((v.x + 1) / 2) * container.clientWidth;
+    const y = ((1 - v.y) / 2) * container.clientHeight;
+    return x < 0 || y < 0 || x > container.clientWidth || y > container.clientHeight ? null : { x, y };
+  }
+  // Only touch the DOM when a label actually appears or goes.
+  const show = (node, on) => { if (node.hidden === !!on) node.hidden = !on; };
+  let tagWidth = 0;
+  function labels() {
+    globe.updateMatrixWorld();
+    const taken = [];
+    const free = (box) => !taken.some((b) => box.left < b.right && box.right > b.left && box.top < b.bottom && box.bottom > b.top);
+    const at = shown && marker.visible ? project(marker.position) : null;
+    show(tag, at && tag.textContent);
+    if (!tag.hidden) {
+      tag.style.transform = `translate(${at.x}px, ${at.y}px) translate(-50%, calc(-100% - 12px))`;
+      tagWidth ||= tag.offsetWidth;
+      taken.push({ left: at.x - tagWidth / 2, right: at.x + tagWidth / 2, top: at.y - 40, bottom: at.y + 8 });
+    }
+    for (const city of cities) {
+      city.box = null;
+      const near = zoom.now >= CITY_ZOOM[city.tier] && project(city.point);
+      // Widths are estimated rather than measured: measuring every frame would force layout.
+      const box = near && { left: near.x - 5, right: near.x + 12 + city.name.length * 6.6, top: near.y - 9, bottom: near.y + 9 };
+      if (box && free(box)) {
+        taken.push(box);
+        city.box = box;
+        city.label.style.transform = `translate(${near.x}px, ${near.y}px)`;
+      }
+      show(city.label, city.box);
+    }
+  }
+
+  // ── Drawing ──
+  function frame(now) {
+    raf = 0;
+    if (lost) return;
+    // Time-based, so a slow device finishes the turn as quickly as a fast one.
+    const elapsed = last ? Math.min(now - last, 250) : 16;
+    last = now;
+    const ease = reduce ? 1 : 1 - 0.85 ** (elapsed / 16);
+    globe.rotation.x += (target.x - globe.rotation.x) * ease;
+    globe.rotation.y += (target.y - globe.rotation.y) * ease;
+    zoom.now += (zoom.target - zoom.now) * ease;
+    if (Math.abs(zoom.target - zoom.now) < 1e-3) zoom.now = zoom.target;
+    camera.zoom = zoom.now;
+    camera.updateProjectionMatrix();
+    marker.scale.setScalar(1 / zoom.now); // the same size on screen however far in
+    const moving = Math.abs(target.x - globe.rotation.x) + Math.abs(target.y - globe.rotation.y) > 1e-4 || zoom.now !== zoom.target;
+    const pulsing = marker.visible && !still();
+    if (pulsing) {
+      const phase = (now / 1600) % 1;
+      ring.scale.setScalar(1 + phase * 1.6);
+      ring.material.opacity = 0.9 * (1 - phase);
+    } else {
+      ring.scale.setScalar(1.4);
+      ring.material.opacity = 0.6;
+    }
+    renderer.render(scene, camera);
+    labels();
+    if (wasMoving && !moving) sharpenSoon(); // the view has settled: paint it sharp
+    wasMoving = moving;
+    if (visible && !document.hidden && (moving || pulsing)) raf = requestAnimationFrame(frame);
+    else last = 0;
+  }
+  function wake() { if (!raf && !lost) raf = requestAnimationFrame(frame); }
+
+  function fit() {
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    if (!width || !height) return;
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.position.z = 4.4 / Math.min(1, camera.aspect); // step back on narrow screens so the globe fits
+    camera.updateProjectionMatrix();
+    sharpenSoon();
+    wake();
+  }
+  new ResizeObserver(fit).observe(container);
+  new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; if (visible) wake(); }).observe(container);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
+  const repaint = () => { paint(); sharpenSoon(); wake(); };
+  darkScheme.addEventListener('change', repaint);
+  addEventListener('fx:theme', repaint);
+  addEventListener('fx:motion', wake);
+  // A phone may take the GPU back under memory pressure; wait, then draw again rather than break.
+  el.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost = true; cancelAnimationFrame(raf); raf = 0; });
+  // three.js uploads everything again by itself; the sharp view is simply repainted.
+  el.addEventListener('webglcontextrestored', () => { lost = false; sharpenSoon(); wake(); });
+
+  /** Rotation that brings a place to the middle, taking the short way round. */
+  function towards(latitude, longitude) {
+    const turn = facing(latitude, longitude);
+    const delta = turn.y - target.y;
+    return { x: clamp(turn.x, -TILT_LIMIT, TILT_LIMIT), y: target.y + delta - 2 * Math.PI * Math.round(delta / (2 * Math.PI)) };
+  }
+
+  // Exact sphere, not the faceted mesh, so a click lands on the very point under it.
+  const raycaster = new THREE.Raycaster();
+  const sphere = new THREE.Sphere(new THREE.Vector3(), 1);
+  const hit = new THREE.Vector3();
+  /** Latitude and longitude under a point in the map (pixels from its top left), or null off the globe. */
+  function surfaceAt(x, y) {
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    raycaster.setFromCamera(new THREE.Vector2((x / width) * 2 - 1, -(y / height) * 2 + 1), camera);
+    if (!raycaster.ray.intersectSphere(sphere, hit)) return null;
+    globe.updateMatrixWorld();
+    return fromSphere(globe.worldToLocal(hit));
+  }
+  const local = (e) => { const rect = el.getBoundingClientRect(); return [e.clientX - rect.left, e.clientY - rect.top]; };
+
+  /** Zoom by a factor; zooming in at a point turns the globe so that point stays put. False at the limit. */
+  function zoomBy(factor, at) {
+    const next = clamp(zoom.target * factor, 1, ZOOM_MAX);
+    if (Math.abs(next - zoom.target) < 1e-6) return false;
+    const spot = next > zoom.target && at ? surfaceAt(...at) : null;
+    if (spot) {
+      const turn = towards(spot.lat, spot.lon);
+      const share = 1 - zoom.target / next;
+      target.x += (turn.x - target.x) * share;
+      target.y += (turn.y - target.y) * share;
+    }
+    zoom.target = next;
+    // Zoomed in, one finger moves the map; at the whole-globe view it scrolls the page as before.
+    el.style.touchAction = zoom.target > 1.01 ? 'none' : '';
+    finer();
+    wake();
+    return true;
+  }
+
+  /** Radians the globe turns per pixel dragged, so the surface follows the pointer at any zoom. */
+  const perPixel = () => (2 * camera.position.z * Math.tan((camera.fov * RAD) / 2)) / (zoom.now * (container.clientHeight || 1));
+
+  // Drag to turn, two fingers to pinch; a press that barely moves is a click on that spot.
+  const pointers = new Map();
+  let drag = null;
+  let pinch = 0;
+  el.addEventListener('pointerdown', (e) => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { el.setPointerCapture(e.pointerId); } catch { /* the pointer already went */ }
+    if (pointers.size === 1) drag = { x: e.clientX, y: e.clientY, moved: 0 };
+    else if (drag) drag.moved = Infinity; // a second finger: never a click
   });
+  el.addEventListener('pointermove', (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size >= 2) {
+      const [a, b] = [...pointers.values()];
+      const distance = Math.hypot(a.x - b.x, a.y - b.y);
+      const rect = el.getBoundingClientRect();
+      if (pinch && distance) zoomBy(distance / pinch, [(a.x + b.x) / 2 - rect.left, (a.y + b.y) / 2 - rect.top]);
+      pinch = distance;
+      return;
+    }
+    if (!drag) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    drag = { x: e.clientX, y: e.clientY, moved: drag.moved + Math.abs(dx) + Math.abs(dy) };
+    const step = perPixel();
+    target.y += dx * step;
+    target.x = clamp(target.x + dy * step, -TILT_LIMIT, TILT_LIMIT);
+    wake();
+  });
+  const release = (e, click) => {
+    if (!pointers.delete(e.pointerId)) return;
+    if (pointers.size < 2) pinch = 0;
+    if (pointers.size) {
+      // One finger left after a pinch: carry on dragging from where it is now.
+      const [rest] = pointers.values();
+      drag = { x: rest.x, y: rest.y, moved: Infinity };
+      return;
+    }
+    if (click && drag && drag.moved < 6) pick(...local(e));
+    drag = null;
+  };
+  el.addEventListener('pointerup', (e) => release(e, true));
+  el.addEventListener('pointercancel', (e) => release(e, false));
+  el.addEventListener('lostpointercapture', (e) => release(e, false));
+
+  el.addEventListener('wheel', (e) => {
+    const pixels = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? container.clientHeight : 1);
+    // A trackpad pinch arrives as a wheel event with ctrlKey and small steps.
+    const factor = Math.exp(-clamp(pixels, -240, 240) * (e.ctrlKey ? 0.01 : 0.0025));
+    const zoomed = zoomBy(factor, local(e));
+    // At the limit the page scrolls on, so the map never traps the scroll.
+    if (zoomed || e.ctrlKey) e.preventDefault();
+  }, { passive: false });
+
+  el.addEventListener('keydown', (e) => {
+    const step = 0.12 / zoom.target;
+    const keys = {
+      ArrowLeft: () => { target.y -= step; }, ArrowRight: () => { target.y += step; },
+      ArrowUp: () => { target.x = clamp(target.x - step, -TILT_LIMIT, TILT_LIMIT); },
+      ArrowDown: () => { target.x = clamp(target.x + step, -TILT_LIMIT, TILT_LIMIT); },
+      '+': () => zoomBy(1.5), '=': () => zoomBy(1.5), '-': () => zoomBy(1 / 1.5), _: () => zoomBy(1 / 1.5),
+    };
+    if (!keys[e.key]) return;
+    e.preventDefault();
+    keys[e.key]();
+    wake();
+  });
+
+  controls.addEventListener('click', (e) => {
+    const action = e.target.closest('button')?.dataset.zoom;
+    if (action === 'in') zoomBy(2);
+    else if (action === 'out') zoomBy(1 / 2);
+    else if (action === 'home' && shown) Object.assign(target, towards(shown.latitude, shown.longitude));
+    wake();
+  });
+
+  function pick(x, y) {
+    // A city's name, or near enough to its dot, gives that city by name.
+    const city = cities.find(({ box }) => box && x >= box.left - 6 && x <= box.right && y >= box.top - 4 && y <= box.bottom + 4);
+    // How closely the map is looked at, on the scale web maps use: the whole globe is about 2.
+    const detail = 2 + Math.log2(zoom.now) * 1.5 + 6;
+    if (city) {
+      onPick(city.latitude, city.longitude, { name: city.name, country_code: city.country_code, detail });
+      return;
+    }
+    const spot = surfaceAt(x, y);
+    if (spot) onPick(Math.round(spot.lat * 1e4) / 1e4, Math.round(spot.lon * 1e4) / 1e4, { detail });
+  }
 
   return {
-    /** Put the pin, tagged with `label`, on a place, and fly there unless it is already in view
-     *  (`follow` false: it was just clicked, so it is). */
-    setPlace({ latitude, longitude }, label = '', follow = true) {
-      tag.textContent = label;
-      tag.hidden = !label;
-      const at = [longitude, latitude];
-      if (shown && shown[0] === longitude && shown[1] === latitude) return;
-      shown = at;
-      marker.setLngLat(at).addTo(map);
-      // Half the view's width in degrees, roughly; the globe's whole face from far out.
-      const reach = Math.min(60, (90 * container.clientWidth) / (256 * 2 ** map.getZoom()));
-      const { lng, lat } = map.getCenter();
-      if (follow && apart([lng, lat], at) > reach * 0.9) {
-        map.flyTo({ center: at, zoom: Math.min(Math.max(map.getZoom(), 3), 10), essential: true });
+    /** Put the marker, tagged with `label`, on a place and turn the globe to face it. */
+    setPlace({ latitude, longitude }, label = '') {
+      if (tag.textContent !== label) { tag.textContent = label; tagWidth = 0; }
+      if (!shown || shown.latitude !== latitude || shown.longitude !== longitude) {
+        shown = { latitude, longitude };
+        const p = toSphere(latitude, longitude, 1.004);
+        marker.position.set(p.x, p.y, p.z);
+        marker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), marker.position.clone().normalize());
+        marker.visible = true;
+        Object.assign(target, towards(latitude, longitude));
       }
+      wake();
     },
   };
 }

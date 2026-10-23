@@ -257,25 +257,23 @@ $('locate').addEventListener('click', () => {
 });
 
 // The 3D map is an extra: it loads alongside the forecast, and if WebGL or the
-// CDN is missing the card goes away and nothing else changes.
-const first = state.place ?? { name: 'Lahore', admin1: 'Punjab', country_code: 'PK', latitude: 31.558, longitude: 74.35 };
-$('mapCard').hidden = false; // the map needs its size to start
+// CDN is missing the card stays hidden and nothing else changes.
 import('./globe.js')
   .then(({ createGlobe }) => createGlobe($('globe'), {
-    center: [first.longitude, first.latitude],
-    onPick: (latitude, longitude, { name, zoom }) => {
-      // A place name on the map gives that place; anywhere else is named once its forecast is in,
-      // as closely as the map is zoomed.
-      const place = name ? { name, latitude, longitude } : spot(latitude, longitude, { detail: zoom });
+    onPick: (latitude, longitude, { name, country_code, detail }) => {
+      // A city's name on the globe gives that city; anywhere else is named once its
+      // forecast is in, as closely as the globe is zoomed.
+      const place = name ? { name, country_code, latitude, longitude } : spot(latitude, longitude, { detail });
       // In the search box too, so "Copy link" shares this spot.
       $('place').value = place.name;
       $('globeCaption').textContent = `Loading the forecast for ${placeLabel(place)}…`;
-      globe.setPlace(place, `${place.name} · …`, false);
+      globe.setPlace(place, `${place.name} · …`);
       show(place).catch(fail);
     },
   }))
   .then((created) => { globe = created; render(); })
-  .catch(() => { $('mapCard').hidden = true; });
+  .catch(() => {});
 
 // Start with the last place, or Lahore on a first visit.
-show(first).catch(fail);
+show(state.place ?? { name: 'Lahore', admin1: 'Punjab', country_code: 'PK', latitude: 31.558, longitude: 74.35 })
+  .catch(fail);
