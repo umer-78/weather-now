@@ -1,0 +1,28 @@
+// Cities named on the globe once you zoom in: tier 1 from a little way in, tier 2 closer still.
+// Clicking a name gives that city's forecast under its own name.
+export const CITIES = [
+  ['London', 'GB', 51.507, -0.128, 1], ['Paris', 'FR', 48.857, 2.352, 1], ['Moscow', 'RU', 55.756, 37.617, 1],
+  ['Istanbul', 'TR', 41.008, 28.978, 1], ['Cairo', 'EG', 30.044, 31.236, 1], ['Lagos', 'NG', 6.524, 3.379, 1],
+  ['Nairobi', 'KE', -1.286, 36.817, 1], ['Johannesburg', 'ZA', -26.204, 28.047, 1], ['Dubai', 'AE', 25.205, 55.271, 1],
+  ['Riyadh', 'SA', 24.713, 46.675, 1], ['Tehran', 'IR', 35.689, 51.389, 1], ['Karachi', 'PK', 24.861, 67.01, 1],
+  ['Lahore', 'PK', 31.558, 74.351, 1], ['Delhi', 'IN', 28.614, 77.209, 1], ['Mumbai', 'IN', 19.076, 72.878, 1],
+  ['Dhaka', 'BD', 23.811, 90.413, 1], ['Bangkok', 'TH', 13.756, 100.502, 1], ['Singapore', 'SG', 1.352, 103.82, 1],
+  ['Jakarta', 'ID', -6.208, 106.846, 1], ['Beijing', 'CN', 39.904, 116.407, 1], ['Shanghai', 'CN', 31.23, 121.474, 1],
+  ['Seoul', 'KR', 37.567, 126.978, 1], ['Tokyo', 'JP', 35.676, 139.65, 1], ['Sydney', 'AU', -33.869, 151.209, 1],
+  ['New York', 'US', 40.713, -74.006, 1], ['Chicago', 'US', 41.878, -87.63, 1], ['Toronto', 'CA', 43.653, -79.383, 1],
+  ['Los Angeles', 'US', 34.052, -118.244, 1], ['Mexico City', 'MX', 19.433, -99.133, 1], ['Lima', 'PE', -12.046, -77.043, 1],
+  ['São Paulo', 'BR', -23.551, -46.633, 1], ['Buenos Aires', 'AR', -34.604, -58.382, 1],
+  ['Islamabad', 'PK', 33.684, 73.048, 2], ['Peshawar', 'PK', 34.008, 71.578, 2], ['Faisalabad', 'PK', 31.418, 73.079, 2],
+  ['Multan', 'PK', 30.198, 71.468, 2], ['Quetta', 'PK', 30.183, 66.996, 2], ['Kabul', 'AF', 34.555, 69.207, 2],
+  ['Madrid', 'ES', 40.417, -3.704, 2], ['Rome', 'IT', 41.903, 12.496, 2], ['Berlin', 'DE', 52.52, 13.405, 2],
+  ['Stockholm', 'SE', 59.329, 18.069, 2], ['Athens', 'GR', 37.984, 23.728, 2], ['Kyiv', 'UA', 50.45, 30.523, 2],
+  ['Reykjavík', 'IS', 64.147, -21.942, 2], ['Casablanca', 'MA', 33.573, -7.59, 2], ['Baghdad', 'IQ', 33.315, 44.366, 2],
+  ['Doha', 'QA', 25.285, 51.531, 2], ['Addis Ababa', 'ET', 9.03, 38.74, 2], ['Kinshasa', 'CD', -4.441, 15.266, 2],
+  ['Cape Town', 'ZA', -33.925, 18.424, 2], ['Kolkata', 'IN', 22.573, 88.364, 2], ['Bengaluru', 'IN', 12.972, 77.595, 2],
+  ['Chennai', 'IN', 13.083, 80.271, 2], ['Kathmandu', 'NP', 27.717, 85.324, 2], ['Colombo', 'LK', 6.927, 79.861, 2],
+  ['Hong Kong', 'HK', 22.32, 114.169, 2], ['Manila', 'PH', 14.6, 120.984, 2], ['Kuala Lumpur', 'MY', 3.139, 101.687, 2],
+  ['Ho Chi Minh City', 'VN', 10.823, 106.63, 2], ['Melbourne', 'AU', -37.814, 144.963, 2], ['Perth', 'AU', -31.95, 115.86, 2],
+  ['Auckland', 'NZ', -36.848, 174.763, 2], ['Honolulu', 'US', 21.307, -157.858, 2], ['Anchorage', 'US', 61.218, -149.9, 2],
+  ['Vancouver', 'CA', 49.283, -123.121, 2], ['San Francisco', 'US', 37.775, -122.419, 2], ['Miami', 'US', 25.762, -80.192, 2],
+  ['Bogotá', 'CO', 4.711, -74.072, 2], ['Santiago', 'CL', -33.449, -70.669, 2], ['Rio de Janeiro', 'BR', -22.907, -43.173, 2],
+].map(([name, country_code, latitude, longitude, tier]) => ({ name, country_code, latitude, longitude, tier }));
