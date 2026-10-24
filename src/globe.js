@@ -286,8 +286,13 @@ export async function createGlobe(container, { onPick }) {
   /** How closely the globe is looked at, on web maps' zoom scale (the whole world is about 2). */
   const webZoom = () => Math.log2((container.clientHeight * zoom.now * 2 * Math.PI)
     / (2 * (camera.position.z - 1) * Math.tan((camera.fov * RAD) / 2) * 256));
-  async function deeper(at) {
-    if (deep || streetsFailed || container.dataset.loading != null) return;
+  /** Hands over to the street map; false when it cannot (it failed to load), so the page scrolls on. */
+  function deeper(at) {
+    if (streetsFailed) return false;
+    if (!deep && container.dataset.loading == null) descend(at);
+    return true;
+  }
+  async function descend(at) {
     const spot = (at && surfaceAt(...at)) || surfaceAt(container.clientWidth / 2, container.clientHeight / 2);
     if (!spot) return;
     container.dataset.loading = '';
@@ -372,7 +377,7 @@ export async function createGlobe(container, { onPick }) {
 
   /** Zoom by a factor; zooming in at a point turns the globe so that point stays put. False at the limit. */
   function zoomBy(factor, at) {
-    if (factor > 1 && zoom.target >= ZOOM_MAX - 1e-6) { deeper(at); return true; }
+    if (factor > 1 && zoom.target >= ZOOM_MAX - 1e-6) return deeper(at);
     const next = clamp(zoom.target * factor, 1, ZOOM_MAX);
     if (Math.abs(next - zoom.target) < 1e-6) return false;
     const spot = next > zoom.target && at ? surfaceAt(...at) : null;
@@ -495,7 +500,8 @@ export async function createGlobe(container, { onPick }) {
         marker.position.set(p.x, p.y, p.z);
         marker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), marker.position.clone().normalize());
         marker.visible = true;
-        Object.assign(target, towards(latitude, longitude));
+        // A spot just clicked is already in view: turning to it would pull the map away.
+        if (follow) Object.assign(target, towards(latitude, longitude));
       }
       wake();
     },

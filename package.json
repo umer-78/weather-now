@@ -1,7 +1,7 @@
 {
   "name": "weather-now",
   "version": "1.0.0",
-  "description": "Weather dashboard on the keyless Open-Meteo API: current conditions, hourly strip from now, seven-day forecast, UV advice and unit switching.",
+  "description": "Weather on the keyless Open-Meteo API under a live 3D sky: hourly and 10-day forecasts, air quality, a rain check, and a 3D globe that zooms down to street level.",
   "type": "module",
   "private": true,
   "scripts": {
