@@ -75,6 +75,8 @@ export async function createStreets(container, { onPick, onLeave }) {
       onPick(round(e.latlng.lat), round(L.Util.wrapNum(e.latlng.lng, [-180, 180], true)), { detail: map.getZoom() });
     }, 250);
   });
+  // Leaflet only follows the window's size; the card can change size on its own.
+  new ResizeObserver(() => { if (!box.hidden) map.invalidateSize(); }).observe(box);
   map.on('zoomend', () => { if (!box.hidden && map.getZoom() <= LEAVE_AT) onLeave(map.getCenter().wrap()); });
 
   return {
