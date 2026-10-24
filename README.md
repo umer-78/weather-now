@@ -13,12 +13,21 @@ Current conditions, the next 24 hours, a 10-day forecast and air quality, from
 [Open-Meteo](https://open-meteo.com/) — which needs no API key and no sign-up.
 No framework, no build step, no tracking.
 
-![Screenshot](docs/screenshot.png)
+![Screenshot](docs/screenshot.jpg)
 
 <sub>Screenshot rendered with a fixed sample response so it looks the same every time.</sub>
 
 ## Features
 
+- **A 3D sky that is the weather.** Behind the page, a three.js scene shows the
+  weather at the place on screen: the sky's colour follows the time of day, the
+  sun crosses on its arc and the moon shows its real phase among the stars,
+  clouds gather with the cloud cover and drift with the real wind, rain and snow
+  fall as hard as they are falling there, storms flash, and poor visibility hangs
+  as mist. Golden hour turns the horizon gold. Without WebGL the page keeps a
+  still gradient in the same mood.
+- **Designed like the [portfolio](https://umer-78.github.io/)**: obsidian, ivory
+  and champagne gold, Cormorant Garamond and Manrope, glass panels and film grain
 - City search with disambiguation (three Lahores? pick the right one), typed
   coordinates (`31.56, 74.35`), and "use my location" through the browser's
   geolocation — high accuracy, named with the town it found, and a warning when
@@ -50,7 +59,7 @@ No framework, no build step, no tracking.
 Node's runner:
 
 ```bash
-node --test      # 35 tests
+node --test      # 38 tests
 ```
 
 Covering the WMO weather-code table, temperature conversion and rounding,
@@ -59,7 +68,8 @@ wind chill only applying when it is cold and windy, the "feels like" phrasing
 rule (in °C and °F), night icons, UV bands on the rounded index, precipitation
 amounts, range bars on a shared scale, wind in km/h or mph, the rain check (today
 or tomorrow, rain or snow), air-quality bands, the moon's phase against known new
-and full moons, the pressure trend, typed coordinates,
+and full moons, the pressure trend, which sky to draw for each kind of weather
+(clouds, rain, mist, night and golden hour from the measured amounts), typed coordinates,
 naming a spot from OpenStreetMap at the map's zoom, the globe maths (a click
 maps back to the same coordinates, turning brings a place to face you, and the
 sharp zoomed-in view lines up with the globe, across the date line too), and —
@@ -86,6 +96,11 @@ python3 -m http.server 8080
   [Nominatim](https://nominatim.org/) for the town's name, and nowhere else.
   Names for spots clicked on the map come from Nominatim too, at most one
   lookup a second as its usage policy asks.
+- The sky (`src/sky.js`) renders at a capped resolution, steps down on devices
+  that cannot keep up, pauses when the tab is hidden and holds still for reduced
+  motion; `src/mood.js` decides what it shows, and is tested.
+- Fonts are Cormorant Garamond and Manrope (SIL Open Font License, in
+  `assets/fonts`), the same files as the portfolio.
 - The street map is OpenStreetMap's own map, drawn with [Leaflet](https://leafletjs.com/)
   and loaded only when you first zoom in that far. Air quality comes from
   Open-Meteo's air-quality service; if it does not answer, the page leaves that

@@ -5,6 +5,7 @@ import {
   airQuery, aqiLevel, moonPhase, pressureTrend, visibilityNote, feelsNote, sunProgress,
 } from './weather.js';
 import { coordinateLabel, parseCoordinates } from './geo.js';
+import { skyMood } from './mood.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -17,6 +18,7 @@ const state = {
   loadedAt: 0,
 };
 let globe = null;
+let sky = null;
 
 function load(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function save(key, value) { try { localStorage.setItem(key, value); } catch { /* private mode */ } }
@@ -156,6 +158,7 @@ function render() {
   }).join('');
 
   $('tiles').innerHTML = tiles(data, days, outlook, unit);
+  paintSky();
   for (const id of ['current', 'hourlyCard', 'dailyCard', 'detailsCard']) $(id).hidden = false;
 
   $('globeCaption').textContent = caption(place, data);
@@ -164,6 +167,16 @@ function render() {
     globe.setPlace(place, `${icon} ${place.name} · ${formatTemperature(current.temperature_2m, unit)}`);
   }
   document.title = `${formatTemperature(current.temperature_2m, unit)} ${placeLabel(place)} — Weather Now`;
+}
+
+/** The sky behind the page shows the weather here: drawn in 3D when it can be, and as a
+ *  gradient in the same mood (data-mood) when it cannot. */
+function paintSky() {
+  const { data } = state;
+  if (!data) return;
+  const mood = skyMood(data.current, { sunrise: data.daily?.sunrise?.[0], sunset: data.daily?.sunset?.[0] });
+  document.documentElement.dataset.mood = mood.night ? 'night' : mood.golden && mood.mood === 'clear' ? 'golden' : mood.mood;
+  sky?.set(mood, moonPhase(new Date()));
 }
 
 /** A small arrow pointing the way the wind blows (it is named for where it comes from). */
@@ -351,6 +364,11 @@ import('./globe.js')
   }))
   .then((created) => { globe = created; render(); })
   .catch(() => {});
+
+// The 3D sky is an extra too: without WebGL the CSS gradient stays.
+import('./sky.js')
+  .then(({ createSky }) => { sky = createSky($('sky')); paintSky(); })
+  .catch(() => { $('sky').hidden = true; });
 
 // Start with the last place, or Lahore on a first visit.
 show(state.place ?? { name: 'Lahore', admin1: 'Punjab', country_code: 'PK', latitude: 31.558, longitude: 74.35 })
