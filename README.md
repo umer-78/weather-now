@@ -27,7 +27,9 @@ No framework, no build step, no tracking.
   as mist. Golden hour turns the horizon gold. Without WebGL the page keeps a
   still gradient in the same mood.
 - **Designed like the [portfolio](https://umer-78.github.io/)**: obsidian, ivory
-  and champagne gold, Cormorant Garamond and Manrope, glass panels and film grain
+  and champagne gold, glass panels and film grain, set in Inter: a clean sans
+  close to the San Francisco font of Apple's weather app, with a thin, large
+  temperature
 - City search with disambiguation (three Lahores? pick the right one), typed
   coordinates (`31.56, 74.35`), and "use my location" through the browser's
   geolocation — high accuracy, named with the town it found, and a warning when
@@ -99,8 +101,7 @@ python3 -m http.server 8080
 - The sky (`src/sky.js`) renders at a capped resolution, steps down on devices
   that cannot keep up, pauses when the tab is hidden and holds still for reduced
   motion; `src/mood.js` decides what it shows, and is tested.
-- Fonts are Cormorant Garamond and Manrope (SIL Open Font License, in
-  `assets/fonts`), the same files as the portfolio.
+- The font is Inter (SIL Open Font License, `assets/fonts`), served with the page.
 - The street map is OpenStreetMap's own map, drawn with [Leaflet](https://leafletjs.com/)
   and loaded only when you first zoom in that far. Air quality comes from
   Open-Meteo's air-quality service; if it does not answer, the page leaves that
