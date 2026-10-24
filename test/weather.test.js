@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   describeCode, formatTemperature, formatPrecipitation, toFahrenheit, windDirection, uvAdvice, windChill,
   summarise, dailyFromResponse, nextHours, forecastQuery, placeLabel, dewPoint, comfortLevel, rangeBar,
-  formatWind, reverseQuery, placeFromReverse,
+  formatWind, reverseQuery, placeFromReverse, formatDistance, rainOutlook, outlookText,
+  airQuery, aqiLevel, moonPhase, pressureTrend, visibilityNote, feelsNote, sunProgress,
 } from '../src/weather.js';
 
 test('weather codes map to text and an icon', () => {
@@ -146,7 +147,7 @@ test('the forecast URL asks for everything the page renders', () => {
   const url = forecastQuery(31.52, 74.35);
   assert.ok(url.startsWith('https://api.open-meteo.com/v1/forecast?'));
   for (const field of ['latitude=31.52', 'longitude=74.35', 'timezone=auto',
-    'apparent_temperature', 'precipitation_probability', 'precipitation_sum', 'uv_index_max', 'forecast_days=7']) {
+    'apparent_temperature', 'precipitation_probability', 'precipitation_sum', 'uv_index_max', 'forecast_days=10']) {
     assert.ok(url.includes(encodeURIComponent(field).replace(/%3D/g, '=').replace(/%2C/g, '%2C')) || url.includes(field),
       `expected ${field} in the query`);
   }
@@ -196,7 +197,8 @@ test('a reverse lookup asks for as much detail as the map is zoomed to', () => {
   const zoom = (url) => new URL(url).searchParams.get('zoom');
   assert.equal(zoom(reverseQuery(31.5, 74.3)), '10');
   assert.equal(zoom(reverseQuery(31.5, 74.3, 13.6)), '14');
-  assert.equal(zoom(reverseQuery(31.5, 74.3, 18)), '14', 'never finer than a neighbourhood');
+  assert.equal(zoom(reverseQuery(31.5, 74.3, 15.6)), '16');
+  assert.equal(zoom(reverseQuery(31.5, 74.3, 19)), '16', 'never finer than a street');
   assert.equal(zoom(reverseQuery(31.5, 74.3, 2)), '8');
   assert.ok(reverseQuery(31.5, 74.3).startsWith('https://nominatim.openstreetmap.org/reverse?'));
 });
@@ -215,4 +217,93 @@ test('a reverse lookup becomes a place with its province or town', () => {
   // open water: Nominatim has nothing
   assert.equal(placeFromReverse({ error: 'Unable to geocode' }), null);
   assert.equal(placeFromReverse(null), null);
+});
+
+test('the rain check finds the first wet hour, today or tomorrow', () => {
+  const hourly = {
+    time: ['2026-10-16T14:00', '2026-10-16T15:00', '2026-10-16T16:00', '2026-10-16T23:00', '2026-10-17T03:00'],
+    precipitation_probability: [90, 10, 20, 30, 70],
+    precipitation: [2, 0, 0, 0.1, 1.2],
+    weather_code: [63, 2, 3, 3, 61],
+  };
+  // the 14:00 shower is over; the chance now is this hour's, and the next wet hour is tomorrow
+  const outlook = rainOutlook(hourly, '2026-10-16T15:15');
+  assert.equal(outlook.chance, 10);
+  assert.deepEqual(outlook.next, { kind: 'Rain', at: '03:00', now: false, tomorrow: true, chance: 70 });
+  assert.equal(outlookText(outlook), 'Rain likely from tomorrow 03:00 (70% chance).');
+  // raining in this very hour, and snow is called snow
+  const snowing = rainOutlook({ ...hourly, weather_code: [73, 73, 73, 73, 73] }, '2026-10-16T14:40');
+  assert.equal(outlookText(snowing), 'Snow likely now (90% chance).');
+  // a forecast amount counts even where no probability is given
+  const noOdds = rainOutlook({ time: hourly.time, precipitation: [0, 0, 0.8, 0, 0] }, '2026-10-16T15:00');
+  assert.equal(outlookText(noOdds), 'Rain likely from 16:00.');
+  // dry for the next day
+  assert.equal(outlookText(rainOutlook({ ...hourly, precipitation_probability: [0, 0, 0, 0, 0], precipitation: [0, 0, 0, 0, 0] }, '2026-10-16T15:00')),
+    'No rain expected in the next 24 hours.');
+  assert.deepEqual(rainOutlook(null, '2026-10-16T15:00'), { chance: null, next: null });
+});
+
+test('hours and days carry their wind', () => {
+  const [hour] = nextHours({
+    time: ['2026-10-16T16:00'], temperature_2m: [20], weather_code: [0], wind_speed_10m: [14.4], wind_direction_10m: [270],
+  }, '2026-10-16T15:30');
+  assert.equal(hour.wind, 14.4);
+  assert.equal(hour.windDirection, 270);
+  const [day] = dailyFromResponse({
+    time: ['2026-10-16'], temperature_2m_max: [30], temperature_2m_min: [20], weather_code: [0],
+    wind_speed_10m_max: [22], wind_gusts_10m_max: [41], wind_direction_10m_dominant: [315],
+  });
+  assert.deepEqual([day.wind, day.gusts, day.windDirection], [22, 41, 315]);
+  const params = new URL(forecastQuery(31.5, 74.3)).searchParams;
+  for (const field of ['cloud_cover', 'pressure_msl', 'visibility']) assert.ok(params.get('current').includes(field), field);
+  assert.ok(params.get('daily').includes('wind_gusts_10m_max'));
+});
+
+test('visibility reads in km, or miles with °F', () => {
+  assert.equal(formatDistance(24140), '24 km');
+  assert.equal(formatDistance(8500), '8.5 km');
+  assert.equal(formatDistance(24140, 'f'), '15 mi');
+  assert.equal(formatDistance(null), '—');
+});
+
+test('air quality bands follow the US EPA index', () => {
+  assert.equal(aqiLevel(0).level, 'Good');
+  assert.equal(aqiLevel(50).level, 'Good');
+  assert.equal(aqiLevel(50.4).level, 'Good', 'banded on the whole number');
+  assert.equal(aqiLevel(51).level, 'Moderate');
+  assert.equal(aqiLevel(151).level, 'Unhealthy');
+  assert.equal(aqiLevel(420).level, 'Hazardous');
+  assert.equal(aqiLevel(null), null);
+  assert.ok(airQuery(31.5, 74.3).startsWith('https://air-quality-api.open-meteo.com/v1/air-quality?'));
+  assert.ok(new URL(airQuery(31.5, 74.3)).searchParams.get('current').includes('us_aqi'));
+});
+
+test('the moon phase matches known new and full moons', () => {
+  assert.equal(moonPhase(new Date(Date.UTC(2024, 3, 8, 18, 21))).name, 'New moon'); // the April 2024 eclipse
+  const full = moonPhase(new Date(Date.UTC(2024, 3, 23, 23, 49)));
+  assert.equal(full.name, 'Full moon');
+  assert.ok(full.lit >= 99);
+  assert.equal(moonPhase(new Date(Date.UTC(2024, 3, 15, 19, 13))).name, 'First quarter');
+});
+
+test('pressure trend over the next three hours', () => {
+  const hourly = { time: ['2026-10-16T15:00', '2026-10-16T16:00', '2026-10-16T17:00', '2026-10-16T18:00'], pressure_msl: [1012, 1012.5, 1013, 1013.4] };
+  assert.equal(pressureTrend(hourly, '2026-10-16T15:15'), 'Rising');
+  assert.equal(pressureTrend({ ...hourly, pressure_msl: [1012, 1011.5, 1011, 1010.5] }, '2026-10-16T15:15'), 'Falling');
+  assert.equal(pressureTrend({ ...hourly, pressure_msl: [1012, 1012, 1012.3, 1012.6] }, '2026-10-16T15:15'), 'Steady');
+  assert.equal(pressureTrend({ time: hourly.time }, '2026-10-16T15:15'), null);
+});
+
+test('notes that explain the numbers', () => {
+  assert.equal(visibilityNote(24000), 'Perfectly clear view.');
+  assert.equal(visibilityNote(600), 'Fog: visibility is very poor.');
+  assert.equal(feelsNote({ temperature_2m: 5, apparent_temperature: 1, wind_speed_10m: 25 }), 'Wind is making it feel cooler.');
+  assert.equal(feelsNote({ temperature_2m: 32, apparent_temperature: 38, relative_humidity_2m: 70 }), 'Humidity is making it feel warmer.');
+  assert.equal(feelsNote({ temperature_2m: 20, apparent_temperature: 20.6 }), 'Similar to the actual temperature.');
+});
+
+test('where the sun is between sunrise and sunset', () => {
+  assert.equal(sunProgress('2026-10-16T12:00', '2026-10-16T06:00', '2026-10-16T18:00'), 0.5);
+  assert.equal(sunProgress('2026-10-16T05:00', '2026-10-16T06:00', '2026-10-16T18:00'), null);
+  assert.equal(sunProgress('2026-10-16T21:00', '2026-10-16T06:00', '2026-10-16T18:00'), null);
 });
