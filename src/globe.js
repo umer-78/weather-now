@@ -19,9 +19,10 @@ import { createStreets } from './streets.js';
 const ATLAS = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/';
 const PALETTE = {
   light: { ocean: '#cfe6f5', land: '#fbfcfd', border: '#aebccc', grid: 'rgba(2, 132, 199, 0.16)' },
-  dark: { ocean: '#11283d', land: '#3b485e', border: '#63708a', grid: 'rgba(56, 189, 248, 0.16)' },
+  // Obsidian and champagne gold, to sit in the page's dark design.
+  dark: { ocean: '#0a1622', land: '#212a36', border: 'rgba(214, 180, 108, 0.6)', grid: 'rgba(214, 180, 108, 0.1)' },
 };
-const MARKER = 0xf97316;
+const MARKER = 0xd6b46c;
 const TILT_LIMIT = 1.3; // radians; keeps the poles from flipping over
 const ZOOM_MAX = 12;
 const SHARP_FROM = 1.6; // zoom from which the view in front is repainted at screen resolution
@@ -126,7 +127,7 @@ export async function createGlobe(container, { onPick }) {
   const target = { x: globe.rotation.x, y: globe.rotation.y };
   const zoom = { now: 1, target: 1 };
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const still = () => reduce || root.classList.contains('fx-still'); // the page's pause-motion button
+  const still = () => reduce;
   let raf = 0;
   let last = 0;
   let visible = true;
@@ -335,8 +336,6 @@ export async function createGlobe(container, { onPick }) {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
   const repaint = () => { paint(); sharpenSoon(); wake(); };
   darkScheme.addEventListener('change', repaint);
-  addEventListener('fx:theme', repaint);
-  addEventListener('fx:motion', wake);
   // A phone may take the GPU back under memory pressure; wait, then draw again rather than break.
   el.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
