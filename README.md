@@ -19,13 +19,16 @@ No framework, no build step, no tracking.
 
 ## Features
 
-- **A 3D sky that is the weather.** Behind the page, a three.js scene shows the
-  weather at the place on screen: the sky's colour follows the time of day, the
-  sun crosses on its arc and the moon shows its real phase among the stars,
-  clouds gather with the cloud cover and drift with the real wind, rain and snow
-  fall as hard as they are falling there, storms flash, and poor visibility hangs
-  as mist. Golden hour turns the horizon gold. Without WebGL the page keeps a
-  still gradient in the same mood.
+- **A real 3D sky, as it looks there now.** Behind the page is the sky over the
+  place on screen, drawn with three.js's physically based model of sunlight in
+  the air: the sun stands at its real height for that latitude, date and hour,
+  so the blue, the haze and a sunset's reds are what you would see. Sunlit
+  clouds thicken with the cloud cover and drift with the real wind; a full deck
+  turns grey and darker under rain. Rain falls as hard as it is falling there
+  and leans with the wind, snow drifts, storms throw forked lightning, mist
+  hangs over distant hills when visibility drops, and at night there are stars
+  and the moon in its real phase. Without WebGL the page keeps a still gradient
+  in the same mood.
 - **Designed like the [portfolio](https://umer-78.github.io/)**: obsidian, ivory
   and champagne gold, glass panels and film grain, set in Inter: a clean sans
   close to the San Francisco font of Apple's weather app, with a thin, large
@@ -61,7 +64,7 @@ No framework, no build step, no tracking.
 Node's runner:
 
 ```bash
-node --test      # 38 tests
+node --test      # 39 tests
 ```
 
 Covering the WMO weather-code table, temperature conversion and rounding,

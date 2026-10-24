@@ -174,7 +174,7 @@ function render() {
 function paintSky() {
   const { data } = state;
   if (!data) return;
-  const mood = skyMood(data.current, { sunrise: data.daily?.sunrise?.[0], sunset: data.daily?.sunset?.[0] });
+  const mood = skyMood(data.current, { sunrise: data.daily?.sunrise?.[0], sunset: data.daily?.sunset?.[0], latitude: state.place?.latitude });
   document.documentElement.dataset.mood = mood.night ? 'night' : mood.golden && mood.mood === 'clear' ? 'golden' : mood.mood;
   sky?.set(mood, moonPhase(new Date()));
 }

@@ -95,7 +95,7 @@
     /* Hero: the place and its weather, large, over the sky */
     .hero { position: relative; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: flex-end; gap: 22px; padding: 120px var(--gutter) clamp(28px, 6vh, 64px); }
     .hero::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-      background: radial-gradient(ellipse 72% 82% at 0% 100%, rgba(7, 7, 8, 0.9), rgba(7, 7, 8, 0.55) 52%, transparent 78%), linear-gradient(to top, rgba(7, 7, 8, 0.92), transparent 40%); }
+      background: radial-gradient(ellipse 80% 95% at 0% 100%, rgba(7, 7, 8, 0.92), rgba(7, 7, 8, 0.66) 50%, rgba(7, 7, 8, 0.22) 75%, transparent 90%), linear-gradient(to top, rgba(7, 7, 8, 0.92), transparent 40%); }
     .eyebrow, .kicker { margin: 0; font: 600 0.7rem/1.2 var(--sans); letter-spacing: 0.34em; text-transform: uppercase; color: var(--gold); }
     .eyebrow { display: flex; align-items: center; gap: 14px; }
     @media (max-width: 640px) {
@@ -364,6 +364,7 @@
       <p>Built by <a href="https://umer-78.github.io/">Umer Hashmi</a> · <a href="https://github.com/umer-78/weather-now">Source on GitHub</a></p>
     </footer>
   </div>
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
   <script type="module" src="src/app.js"></script>
   <script type="module" src="src/depth.js"></script>
   <script>
