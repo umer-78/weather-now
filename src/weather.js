@@ -44,6 +44,13 @@ export function formatWind(kmh, unit = 'c') {
   return unit === 'f' ? `${Math.round(kmh * 0.621371)} mph` : `${Math.round(kmh)} km/h`;
 }
 
+/** Visibility and other distances: km with °C, miles with °F. */
+export function formatDistance(meters, unit = 'c') {
+  if (meters == null || Number.isNaN(meters)) return '—';
+  const value = unit === 'f' ? meters / 1609.344 : meters / 1000;
+  return `${value < 10 ? Math.round(value * 10) / 10 : Math.round(value)} ${unit === 'f' ? 'mi' : 'km'}`;
+}
+
 /** Compass point from a bearing in degrees. */
 export function windDirection(degrees) {
   const points = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
@@ -120,6 +127,9 @@ export function dailyFromResponse(daily) {
     code: daily.weather_code[i],
     rainChance: daily.precipitation_probability_max?.[i] ?? null,
     precipitation: daily.precipitation_sum?.[i] ?? null,
+    wind: daily.wind_speed_10m_max?.[i] ?? null,
+    gusts: daily.wind_gusts_10m_max?.[i] ?? null,
+    windDirection: daily.wind_direction_10m_dominant?.[i] ?? null,
     sunrise: daily.sunrise?.[i]?.slice(11, 16) ?? null,
     sunset: daily.sunset?.[i]?.slice(11, 16) ?? null,
   }));
@@ -149,8 +159,46 @@ export function nextHours(hourly, from = new Date(), count = 12) {
     code: hourly.weather_code[begin + i],
     rainChance: hourly.precipitation_probability?.[begin + i] ?? null,
     precipitation: hourly.precipitation?.[begin + i] ?? null,
+    wind: hourly.wind_speed_10m?.[begin + i] ?? null,
+    windDirection: hourly.wind_direction_10m?.[begin + i] ?? null,
     isDay: hourly.is_day?.[begin + i],
   }));
+}
+
+const SNOW = new Set([71, 73, 75, 77, 85, 86]);
+
+/** The rain check: the chance of rain this hour, and the first hour in the next day that
+ *  is likely to be wet (half a chance or more, or half a millimetre forecast). `now` is
+ *  Open-Meteo's current.time, in the place's own time. */
+export function rainOutlook(hourly, now, horizon = 24, likely = 50) {
+  const none = { chance: null, next: null };
+  if (!hourly?.time?.length || !now) return none;
+  const start = hourly.time.findIndex((t) => t.slice(0, 13) >= now.slice(0, 13));
+  if (start === -1) return none;
+  const chance = (i) => hourly.precipitation_probability?.[i] ?? null;
+  for (let i = start; i < Math.min(hourly.time.length, start + horizon); i++) {
+    if ((chance(i) ?? 0) >= likely || (hourly.precipitation?.[i] ?? 0) >= 0.5) {
+      const time = hourly.time[i];
+      return {
+        chance: chance(start),
+        next: {
+          kind: SNOW.has(hourly.weather_code?.[i]) ? 'Snow' : 'Rain',
+          at: time.slice(11, 16),
+          now: i === start,
+          tomorrow: time.slice(0, 10) !== now.slice(0, 10),
+          chance: chance(i),
+        },
+      };
+    }
+  }
+  return { chance: chance(start), next: null };
+}
+
+export function outlookText({ next }) {
+  if (!next) return 'No rain expected in the next 24 hours.';
+  const odds = next.chance == null ? '' : ` (${next.chance}% chance)`;
+  if (next.now) return `${next.kind} likely now${odds}.`;
+  return `${next.kind} likely from ${next.tomorrow ? 'tomorrow ' : ''}${next.at}${odds}.`;
 }
 
 export const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
@@ -159,23 +207,92 @@ export const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 export function forecastQuery(latitude, longitude, timezone = 'auto') {
   return `${FORECAST_URL}?${new URLSearchParams({
     latitude, longitude, timezone,
-    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day,precipitation',
-    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,is_day',
-    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,uv_index_max',
-    forecast_days: '7',
+    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day,precipitation,cloud_cover,pressure_msl,visibility',
+    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,is_day,wind_speed_10m,wind_direction_10m,pressure_msl',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,uv_index_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant',
+    forecast_days: '10',
   })}`;
+}
+
+export const AIR_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+
+export function airQuery(latitude, longitude) {
+  return `${AIR_URL}?${new URLSearchParams({ latitude, longitude, timezone: 'auto', current: 'us_aqi,pm2_5,pm10' })}`;
+}
+
+/** US EPA Air Quality Index bands. */
+export function aqiLevel(aqi) {
+  if (aqi == null || Number.isNaN(aqi)) return null;
+  const bands = [
+    [50, 'Good', 'Air quality is satisfactory.'],
+    [100, 'Moderate', 'Unusually sensitive people should limit long outdoor exertion.'],
+    [150, 'Unhealthy for sensitive groups', 'Children, older people and anyone with heart or lung disease should take it easier outdoors.'],
+    [200, 'Unhealthy', 'Everyone should limit long outdoor exertion.'],
+    [300, 'Very unhealthy', 'Avoid long outdoor exertion; sensitive groups stay indoors.'],
+  ];
+  const [, level, advice] = bands.find(([top]) => Math.round(aqi) <= top) ?? [0, 'Hazardous', 'Everyone should stay indoors.'];
+  return { level, advice };
+}
+
+const SYNODIC = 29.530588853; // days from new moon to new moon
+const NEW_MOON = Date.UTC(2000, 0, 6, 18, 14); // a known new moon
+
+/** The moon's phase on a date: its name, an icon, and how much of it is lit. */
+export function moonPhase(date = new Date()) {
+  const age = ((((date - NEW_MOON) / 86400000) % SYNODIC) + SYNODIC) % SYNODIC;
+  const phases = [
+    ['New moon', '🌑'], ['Waxing crescent', '🌒'], ['First quarter', '🌓'], ['Waxing gibbous', '🌔'],
+    ['Full moon', '🌕'], ['Waning gibbous', '🌖'], ['Last quarter', '🌗'], ['Waning crescent', '🌘'],
+  ];
+  const [name, icon] = phases[Math.round((age / SYNODIC) * 8) % 8];
+  return { name, icon, lit: Math.round(((1 - Math.cos((2 * Math.PI * age) / SYNODIC)) / 2) * 100), age };
+}
+
+/** Pressure over the next three hours: rising, falling or steady (more than 1 hPa counts). */
+export function pressureTrend(hourly, now) {
+  const start = hourly?.time?.findIndex((t) => t.slice(0, 13) >= String(now).slice(0, 13)) ?? -1;
+  const a = hourly?.pressure_msl?.[start];
+  const b = hourly?.pressure_msl?.[start + 3];
+  if (start === -1 || a == null || b == null) return null;
+  return b - a > 1 ? 'Rising' : a - b > 1 ? 'Falling' : 'Steady';
+}
+
+export function visibilityNote(meters) {
+  if (meters == null) return '';
+  if (meters >= 20000) return 'Perfectly clear view.';
+  if (meters >= 10000) return 'Clear view.';
+  if (meters >= 4000) return 'Haze is softening distant views.';
+  if (meters >= 1000) return 'Mist or haze is cutting visibility.';
+  return 'Fog: visibility is very poor.';
+}
+
+/** Why "feels like" differs from the thermometer, in a sentence. */
+export function feelsNote({ temperature_2m: t, apparent_temperature: feels, wind_speed_10m: wind, relative_humidity_2m: humidity }) {
+  if (t == null || feels == null) return '';
+  const difference = feels - t;
+  if (Math.abs(difference) < 1.5) return 'Similar to the actual temperature.';
+  if (difference < 0) return wind >= 15 ? 'Wind is making it feel cooler.' : 'It feels cooler than it is.';
+  return humidity >= 50 ? 'Humidity is making it feel warmer.' : 'Sunshine is making it feel warmer.';
+}
+
+/** Where the sun is between sunrise and sunset, 0 to 1 (null at night), from local "HH:MM" times. */
+export function sunProgress(now, sunrise, sunset) {
+  const minutes = (time) => (time ? Number(time.slice(-5, -3)) * 60 + Number(time.slice(-2)) : null);
+  const [n, rise, set] = [minutes(now), minutes(sunrise), minutes(sunset)];
+  if (n == null || rise == null || set == null || set <= rise) return null;
+  return n < rise || n > set ? null : (n - rise) / (set - rise);
 }
 
 // Names for a spot clicked on the map or found by the browser's location come
 // from OpenStreetMap's Nominatim.
 export const REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse';
 
-/** `detail` is Nominatim's zoom: 10 names the city, 14 the neighbourhood, so a click
- *  on a closely zoomed map is named as closely. */
+/** `detail` is Nominatim's zoom: 10 names the city, 14 the neighbourhood, 16 the street,
+ *  so a click on a closely zoomed map is named as closely. */
 export function reverseQuery(latitude, longitude, detail = 10) {
   return `${REVERSE_URL}?${new URLSearchParams({
     format: 'jsonv2', lat: latitude, lon: longitude,
-    zoom: String(Math.min(14, Math.max(8, Math.round(detail)))), 'accept-language': 'en',
+    zoom: String(Math.min(16, Math.max(8, Math.round(detail)))), 'accept-language': 'en',
   })}`;
 }
 

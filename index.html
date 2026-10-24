@@ -1,465 +1,349 @@
 <!doctype html>
-<html lang="en" data-scene="network" data-fx-compact="">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Weather Now — Live Conditions & 7-Day Forecast</title>
+  <title>Weather Now — Live Weather, 10-Day Forecast & a 3D World</title>
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Weather Now — Live Conditions & 7-Day Forecast">
-  <meta property="og:description" content="Current conditions, an hourly strip and a seven-day forecast from the keyless Open-Meteo API. No API key, no tracking.">
+  <meta property="og:title" content="Weather Now — Live Weather, 10-Day Forecast & a 3D World">
+  <meta property="og:description" content="Current conditions, the next 24 hours, a 10-day forecast and air quality from the keyless Open-Meteo API. No API key, no tracking.">
   <meta property="og:url" content="https://umer-78.github.io/weather-now/">
   <meta name="twitter:card" content="summary">
-  <meta name="description" content="Current conditions, an hourly strip and a seven-day forecast from the keyless Open-Meteo API. No API key, no tracking.">
-  <meta name="theme-color" content="#0284c7" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0a0c10" media="(prefers-color-scheme: dark)">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%230284c7'/><stop offset='1' stop-color='%236366f1'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><circle cx='13' cy='13' r='5' fill='%23fbbf24'/><path d='M9 22h14a4 4 0 000-8 6 6 0 00-11-2 4 4 0 00-3 10z' fill='white'/></svg>">
+  <meta name="description" content="Current conditions, the next 24 hours, a 10-day forecast and air quality from the keyless Open-Meteo API. No API key, no tracking.">
+  <meta name="theme-color" content="#070708">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23f6e7c1'/><stop offset='.5' stop-color='%23d6b46c'/><stop offset='1' stop-color='%23a8843f'/></linearGradient></defs><rect width='32' height='32' rx='16' fill='%23070708'/><circle cx='16' cy='16' r='15' fill='none' stroke='url(%23g)' stroke-width='1.2'/><text x='16' y='21.5' text-anchor='middle' font-family='Georgia,serif' font-size='16' fill='url(%23g)'>W</text></svg>">
+  <link rel="preload" href="assets/fonts/cormorant-garamond.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/manrope.woff2" as="font" type="font/woff2" crossorigin>
   <style>
+    @font-face { font-family: 'Cormorant Garamond'; src: url('assets/fonts/cormorant-garamond.woff2') format('woff2'); font-weight: 300 500; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Cormorant Garamond'; src: url('assets/fonts/cormorant-garamond-italic.woff2') format('woff2'); font-weight: 300 500; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'Manrope'; src: url('assets/fonts/manrope.woff2') format('woff2'); font-weight: 200 800; font-style: normal; font-display: swap; }
+
+    /* One dark theme, as in the portfolio: obsidian, ivory and champagne gold, glass over a live sky. */
+    /* The serif's figures are old-style by default; numbers here read better level. */
+    .hour .t, .day .hi, .day > span:first-child, .tile .value { font-variant-numeric: lining-nums tabular-nums; }
     :root {
-      --bg: #fafbfc;
-      --bg-elevated: #ffffff;
-      --surface: #ffffff;
-      --surface-2: #f3f4f6;
-      --surface-3: #e9eaee;
-      --border: #e2e4e9;
-      --border-strong: #d0d3da;
-      --text: #0f1216;
-      --text-secondary: #3d4450;
-      --muted: #5f6673;
-      --accent: #0284c7;
-      --accent-hover: #0369a1;
-      --accent-soft: #f0f9ff;
-      --accent-glow: rgb(2 132 199 / 0.15);
-      --accent-2: #6366f1;
-      --good: #047857;
-      --good-soft: #ecfdf5;
-      --bad: #b91c1c;
-      --bad-soft: #fef2f2;
-      --warn: #a14c07;
-      --warn-soft: #fffbeb;
-      --radius-sm: 8px;
-      --radius: 14px;
-      --radius-lg: 20px;
-      --radius-xl: 28px;
-      --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.04);
-      --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.06), 0 4px 12px rgb(0 0 0 / 0.04);
-      --shadow-md: 0 4px 6px rgb(0 0 0 / 0.04), 0 10px 24px rgb(0 0 0 / 0.06);
-      --shadow-lg: 0 8px 16px rgb(0 0 0 / 0.06), 0 24px 48px rgb(0 0 0 / 0.08);
-      --shadow-glow: 0 0 0 3px var(--accent-glow);
-      --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-      --mono: "SF Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
+      --bg: #070708;
+      --glass: rgba(10, 9, 9, 0.58);
+      --glass-strong: rgba(10, 9, 9, 0.78);
+      --ivory: #f2ece1;
+      --text: #e6dfd2;
+      --text-secondary: #cfc6b7;
+      --muted: #a39b8d;
+      --faint: #6f685e;
+      --gold: #d6b46c;
+      --gold-hi: #f1dcaa;
+      --gold-grad: linear-gradient(120deg, #f6e7c1 0%, #d6b46c 34%, #a8843f 58%, #ecd398 100%);
+      --line: rgba(214, 180, 108, 0.16);
+      --line-strong: rgba(214, 180, 108, 0.4);
+      --bad: #f19c8c;
+      --serif: 'Cormorant Garamond', 'Cormorant', Garamond, 'Times New Roman', serif;
+      --sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
       --ease: cubic-bezier(0.16, 1, 0.3, 1);
-      --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
-      color-scheme: light;
+      --gutter: clamp(16px, 4vw, 56px);
+      --radius: 18px;
+      --radius-sm: 12px;
+      /* names the weather scripts and the globe read */
+      --surface: #14120f; --surface-2: rgba(255, 255, 255, 0.04); --surface-3: rgba(255, 255, 255, 0.08);
+      --border: var(--line); --border-strong: var(--line-strong); --accent: var(--gold); --accent-soft: rgba(214, 180, 108, 0.1);
+      --shadow-sm: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+      color-scheme: dark;
     }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #0a0c10;
-        --bg-elevated: #12151b;
-        --surface: #161a22;
-        --surface-2: #1e232d;
-        --surface-3: #272d39;
-        --border: #2a3040;
-        --border-strong: #3a4155;
-        --text: #f0f2f5;
-        --text-secondary: #c4c9d4;
-        --muted: #8b92a5;
-        --accent: #38bdf8;
-        --accent-hover: #7dd3fc;
-        --accent-soft: rgb(56 189 248 / 0.12);
-        --accent-glow: rgb(56 189 248 / 0.25);
-        --accent-2: #818cf8;
-        --good: #34d399;
-        --good-soft: rgb(52 211 153 / 0.12);
-        --bad: #f87171;
-        --bad-soft: rgb(248 113 113 / 0.12);
-        --warn: #fbbf24;
-        --warn-soft: rgb(251 191 36 / 0.12);
-        --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.2);
-        --shadow-md: 0 4px 6px rgb(0 0 0 / 0.25), 0 10px 24px rgb(0 0 0 / 0.3);
-        --shadow-lg: 0 8px 16px rgb(0 0 0 / 0.3), 0 24px 48px rgb(0 0 0 / 0.35);
-        color-scheme: dark;
-      }
-    }
-
     *, *::before, *::after { box-sizing: border-box; }
-    [hidden] { display: none !important; }
-    html { scroll-behavior: smooth; }
-    html, body { margin: 0; padding: 0; }
-    body {
-      font-family: var(--font);
-      font-size: 15.5px;
-      line-height: 1.6;
-      background: var(--bg);
-      color: var(--text);
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-      min-height: 100vh;
-    }
-    body::before {
-      content: "";
-      position: fixed; inset: 0; z-index: -1;
-      background:
-        radial-gradient(ellipse 80% 50% at 20% -10%, var(--accent-glow), transparent 50%),
-        radial-gradient(ellipse 60% 40% at 80% 110%, var(--accent-glow), transparent 50%),
-        var(--bg);
-      pointer-events: none;
-    }
-    a { color: var(--accent); text-decoration: none; transition: color 0.2s var(--ease); }
-    a:hover { color: var(--accent-hover); }
-    code, .mono { font-family: var(--mono); font-size: 0.9em; }
-    ::selection { background: var(--accent-soft); color: var(--text); }
-
-    .wrap { max-width: 820px; margin: 0 auto; padding: 0 20px; }
-
-    header.top {
-      display: flex; align-items: center; justify-content: space-between; gap: 16px;
-      padding: 20px 0; margin-bottom: 28px; flex-wrap: wrap;
-      border-bottom: 1px solid var(--border);
-      animation: fadeDown 0.6s var(--ease) both;
-    }
-    header.top .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
-    header.top .icon {
-      width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 18px;
-      box-shadow: 0 4px 12px var(--accent-glow);
-    }
-    header.top h1 { font-size: 22px; margin: 0; letter-spacing: -0.02em; font-weight: 700; }
-    header.top .sub { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
-    header.top .actions { display: flex; gap: 8px; flex-shrink: 0; }
-
-    button, .btn {
-      font: inherit; cursor: pointer; border: none; outline: none;
-      transition: all 0.25s var(--ease);
-    }
-    .btn, button:not(.linkish) {
-      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-      padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: 14px;
-      background: var(--surface-2); color: var(--text);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow-xs);
-    }
-    .btn:hover, button:not(.linkish):hover {
-      background: var(--surface-3); border-color: var(--border-strong);
-      transform: translateY(-1px); box-shadow: var(--shadow-sm);
-    }
-    .btn:active, button:not(.linkish):active { transform: translateY(0) scale(0.98); }
-    .btn.primary, button.primary {
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #fff; border-color: transparent;
-      box-shadow: 0 2px 8px var(--accent-glow), inset 0 1px 0 rgb(255 255 255 / 0.15);
-    }
-    .btn.primary:hover, button.primary:hover {
-      filter: brightness(1.1);
-      box-shadow: 0 4px 16px var(--accent-glow), inset 0 1px 0 rgb(255 255 255 / 0.2);
-      transform: translateY(-1px);
-    }
-    button:focus-visible, .btn:focus-visible, a:focus-visible, input:focus-visible {
-      outline: 2px solid var(--accent); outline-offset: 2px;
-    }
-
-    .card {
-      background: color-mix(in srgb, var(--surface) 85%, transparent);
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 24px;
-      box-shadow: var(--shadow-sm);
-      margin-bottom: 20px;
-      min-width: 0;
-      transition: box-shadow 0.3s var(--ease), transform 0.3s var(--ease), border-color 0.3s var(--ease);
-      animation: fadeUp 0.5s var(--ease) backwards;
-    }
-    .card:nth-of-type(1) { animation-delay: 0.1s; }
-    .card:nth-of-type(2) { animation-delay: 0.15s; }
-    .card:nth-of-type(3) { animation-delay: 0.2s; }
-    .card:hover { box-shadow: var(--shadow-md); border-color: var(--border-strong); }
-    .card > h2 {
-      font-size: 16px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .card .desc, .card > h2 + .desc { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
-    .card + .card { margin-top: 16px; }
-
-    label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
-    input, select, textarea {
-      font: inherit; color: var(--text);
-      width: 100%; padding: 11px 14px; border-radius: 10px;
-      border: 1.5px solid var(--border); background: var(--surface);
-      outline: none; min-width: 0;
-      transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), background 0.2s var(--ease);
-    }
-    input:hover, select:hover, textarea:hover { border-color: var(--border-strong); }
-    input:focus, select:focus, textarea:focus {
-      border-color: var(--accent); box-shadow: var(--shadow-glow);
-      background: var(--bg-elevated);
-      outline: none;
-    }
-    input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.7; }
-    .row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; animation: fadeUp 0.5s var(--ease) 0.05s backwards; }
-    .row > * { flex: 1 1 200px; }
-    .row > button, .row > .btn { flex: 0 0 auto; }
-
-    .suggestions {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); box-shadow: var(--shadow-md);
-      margin-top: 8px; overflow: hidden;
-      animation: fadeUp 0.3s var(--ease) backwards;
-    }
-    .suggestions button {
-      display: block; width: 100%; text-align: left;
-      border: 0; border-bottom: 1px solid var(--border); border-radius: 0;
-      background: none; padding: 12px 16px; font-weight: 500;
-      box-shadow: none;
-    }
-    .suggestions button:last-child { border-bottom: 0; }
-    .suggestions button:hover, .suggestions button:focus-visible {
-      background: var(--accent-soft); color: var(--accent);
-      transform: none; box-shadow: none;
-    }
-
-    .current { margin-top: 16px; }
-    .now { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
-    .now .icon {
-      width: 76px; height: 76px; border-radius: 20px; flex-shrink: 0;
-      display: grid; place-items: center;
-      font-size: 44px; line-height: 1;
-      background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--accent-2) 12%, transparent));
-      border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
-      box-shadow: 0 8px 24px var(--accent-glow);
-    }
-    .now .temp {
-      font-size: 44px; font-weight: 800; letter-spacing: -0.03em;
-      line-height: 1.1; font-variant-numeric: tabular-nums;
-    }
-    .now .place { font-weight: 700; font-size: 16px; margin-top: 2px; }
-    .facts {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 12px 18px; margin: 18px 0 0; padding-top: 16px;
-      border-top: 1px solid var(--border);
-    }
-    .facts dt {
-      font-size: 11px; color: var(--muted); text-transform: uppercase;
-      letter-spacing: 0.08em; font-weight: 600;
-    }
-    .facts dd { margin: 2px 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
-
-    .strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin-top: 14px; }
-    .hour {
-      flex: 0 0 78px; text-align: center;
-      background: var(--surface-2); border: 1px solid transparent;
-      border-radius: var(--radius); padding: 12px 6px;
-      transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), border-color 0.25s var(--ease);
-      animation: fadeUp 0.4s var(--ease) backwards;
-    }
-    .hour:nth-child(1) { animation-delay: 0.08s; }
-    .hour:nth-child(2) { animation-delay: 0.11s; }
-    .hour:nth-child(3) { animation-delay: 0.14s; }
-    .hour:nth-child(4) { animation-delay: 0.17s; }
-    .hour:nth-child(5) { animation-delay: 0.2s; }
-    .hour:nth-child(6) { animation-delay: 0.23s; }
-    .hour:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--border); }
-    .hour .h { font-size: 12px; color: var(--muted); font-weight: 600; }
-    .hour .i { font-size: 22px; margin: 2px 0; }
-    .hour .t { font-weight: 700; font-variant-numeric: tabular-nums; }
-    .hour .r { font-size: 11px; color: var(--accent); font-weight: 600; }
-    .hour .p { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-
-    .days { display: grid; gap: 4px; margin-top: 12px; }
-    .day {
-      display: grid; grid-template-columns: 54px 48px 1fr 96px; gap: 10px; align-items: center;
-      padding: 10px 8px; border-bottom: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      transition: background 0.15s var(--ease);
-    }
-    .day:hover { background: var(--surface-2); }
-    .day:last-child { border-bottom: 0; }
-    .day > span:first-child { font-weight: 600; font-size: 14px; }
-    .day .ic { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 2.2em; line-height: 1.15; }
-    .day .ic small { font-size: 11px; color: var(--accent); font-weight: 600; white-space: nowrap; }
-    .day .ic small.mm { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
-    .day .range { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
-    .day .lo { flex: 0 0 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
-    .day .track { flex: 1; position: relative; height: 6px; border-radius: 3px; background: var(--surface-3); }
-    .day .bar {
-      position: absolute; inset: 0;
-      background: linear-gradient(90deg, #38bdf8, #fbbf24, #f97316);
-      opacity: 0.65;
-    }
-    .day .hi { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
-
-    .globe {
-      position: relative; height: clamp(260px, 56vw, 400px); margin-top: 4px;
-      cursor: grab; touch-action: pan-y; user-select: none;
-      background: radial-gradient(circle at 50% 50%, var(--accent-glow), transparent 58%);
-    }
-    .globe:active { cursor: grabbing; }
-    .globe canvas { display: block; width: 100%; height: 100%; }
-    .globe canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
-    .globe-labels { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-    .globe-labels > div { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform; }
-    .globe-tag {
-      padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 700;
-      background: var(--surface); color: var(--text); border: 1px solid #f97316;
-      box-shadow: 0 4px 14px rgb(0 0 0 / 0.18); font-variant-numeric: tabular-nums;
-    }
-    .globe-city {
-      display: flex; align-items: center; gap: 5px; margin: -8px 0 0 -3px; line-height: 16px;
-      font-size: 11.5px; font-weight: 600; color: var(--text-secondary);
-      text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface), 0 0 2px var(--surface);
-    }
-    .globe-city::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); box-shadow: 0 0 0 1.5px var(--surface); }
-    .globe-controls { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 6px; }
-    .globe-controls button { width: 36px; height: 36px; padding: 0; border-radius: 10px; font-size: 18px; line-height: 1; }
-    .caption { margin: 10px 0 0; font-size: 13px; text-align: center; font-variant-numeric: tabular-nums; }
-
-    .muted { color: var(--muted); }
-    .error { color: var(--bad); min-height: 1.4em; margin: 8px 0 0; font-size: 14px; }
+    html { background: var(--bg); scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body { margin: 0; color: var(--text); font: 400 1rem/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; background: transparent; }
+    ::selection { background: rgba(214, 180, 108, 0.35); color: var(--ivory); }
+    :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
+    a { color: inherit; }
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-    footer {
-      margin-top: 40px; padding-top: 24px;
-      border-top: 1px solid var(--border);
-      color: var(--muted); font-size: 13px; text-align: center;
-      animation: fadeUp 0.5s var(--ease) 0.4s backwards;
+    /* The sky: a 3D scene of the weather at the place shown (src/sky.js). Without WebGL,
+       a still gradient in the same mood. */
+    #sky { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100lvh; z-index: 0; display: block; }
+    html { --sky: linear-gradient(180deg, #163f78, #8fb8db 70%, #070708); }
+    html[data-mood="cloudy"] { --sky: linear-gradient(180deg, #2f3c4c, #7d8894 70%, #070708); }
+    html[data-mood="rain"], html[data-mood="storm"] { --sky: linear-gradient(180deg, #0d1014, #4a545e 70%, #070708); }
+    html[data-mood="snow"], html[data-mood="fog"] { --sky: linear-gradient(180deg, #4c5a69, #b9c3cc 70%, #070708); }
+    html[data-mood="golden"] { --sky: linear-gradient(180deg, #221d3c, #d39a52 70%, #070708); }
+    html[data-mood="night"] { --sky: linear-gradient(180deg, #03050b, #141c2e 70%, #070708); }
+    body::before { content: ""; position: fixed; inset: 0; z-index: -1; background: var(--sky); transition: background 1.2s; }
+    .grain {
+      position: fixed; inset: -50%; z-index: 60; pointer-events: none; opacity: 0.05;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      animation: grain 1.2s steps(6) infinite;
     }
-    footer a { color: var(--text-secondary); font-weight: 600; }
-    footer a:hover { color: var(--accent); }
+    @keyframes grain { 0% { transform: translate(0, 0); } 33% { transform: translate(-3%, 2%); } 66% { transform: translate(2%, -3%); } 100% { transform: translate(0, 0); } }
+    .site { position: relative; z-index: 1; }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes fadeDown {
-      from { opacity: 0; transform: translateY(-12px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    .skip-link { position: fixed; left: 16px; top: -80px; z-index: 100; padding: 10px 16px; border-radius: 999px; background: var(--gold); color: #0d0a06; font-weight: 700; text-decoration: none; }
+    .skip-link:focus { top: 16px; }
 
-    @media (max-width: 560px) {
-      header.top { padding: 16px 0; margin-bottom: 20px; }
-      header.top h1 { font-size: 20px; }
-      .card { padding: 18px; }
-      .now .temp { font-size: 36px; }
-      .now .icon { width: 64px; height: 64px; font-size: 36px; border-radius: 16px; }
-      .day { grid-template-columns: 44px 44px 1fr 52px; gap: 6px; font-size: 14px; }
-      .row > button, .row > .btn { width: auto; flex: 1 1 auto; }
+    /* Navigation */
+    .nav::before { content: ""; position: absolute; inset: 0 0 -24px; z-index: -1; pointer-events: none; background: linear-gradient(rgba(7, 7, 8, 0.55), transparent); transition: opacity 0.5s; }
+    .nav.scrolled::before { opacity: 0; }
+    .nav { position: fixed; inset: 0 0 auto; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px var(--gutter); border-bottom: 1px solid transparent; transition: background 0.5s, border-color 0.5s, padding 0.5s var(--ease); }
+    .nav.scrolled { padding-block: 12px; background: rgba(7, 7, 8, 0.62); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3); border-bottom-color: var(--line); }
+    .brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ivory); }
+    .mono { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--line-strong); border-radius: 50%; font: 400 1rem/1 var(--serif); letter-spacing: 0.08em; color: var(--gold-hi); }
+    .brand-name { font: 500 1.2rem/1 var(--serif); letter-spacing: 0.04em; }
+    .nav-links { display: flex; gap: clamp(14px, 2.4vw, 34px); }
+    .nav-links a { font: 600 0.68rem/1 var(--sans); letter-spacing: 0.26em; text-transform: uppercase; text-decoration: none; color: var(--text-secondary); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5); transition: color 0.3s; }
+    .nav-links a:hover { color: var(--gold-hi); }
+    .actions { display: flex; gap: 8px; align-items: center; }
+    .btn, .actions a.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(7, 7, 8, 0.3); color: var(--ivory); font: 600 0.68rem/1 var(--sans); letter-spacing: 0.18em; text-transform: uppercase; text-decoration: none; cursor: pointer; transition: transform 0.4s var(--ease), border-color 0.3s, color 0.3s; backdrop-filter: blur(6px); }
+    .btn:hover { border-color: var(--gold); color: var(--gold-hi); transform: translateY(-2px); }
+    .actions .btn.share-link-btn { font: 600 0.68rem/1 var(--sans); letter-spacing: 0.18em; text-transform: uppercase; }
+    @media (max-width: 860px) { .nav-links { display: none; } }
+    @media (max-width: 480px) { .brand-name { display: none; } .actions .btn { padding: 0 14px; } }
+
+    /* Hero: the place and its weather, large, over the sky */
+    .hero { position: relative; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: flex-end; gap: 22px; padding: 120px var(--gutter) clamp(28px, 6vh, 64px); }
+    .hero::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+      background: radial-gradient(ellipse 72% 82% at 0% 100%, rgba(7, 7, 8, 0.9), rgba(7, 7, 8, 0.55) 52%, transparent 78%), linear-gradient(to top, rgba(7, 7, 8, 0.92), transparent 40%); }
+    .eyebrow, .kicker { margin: 0; font: 600 0.7rem/1.2 var(--sans); letter-spacing: 0.34em; text-transform: uppercase; color: var(--gold); }
+    .eyebrow { display: flex; align-items: center; gap: 14px; }
+    @media (max-width: 640px) {
+      .eyebrow .rule, .eyebrow span:last-child { display: none; }
+      .hero::before { background: linear-gradient(to top, rgba(7, 7, 8, 0.94), rgba(7, 7, 8, 0.62) 58%, rgba(7, 7, 8, 0.3)); }
     }
+    .eyebrow .rule { width: 46px; height: 1px; background: var(--line-strong); }
+    .now { max-width: 60rem; }
+    .now .place { margin: 18px 0 0; font: italic 300 clamp(2.2rem, 6vw, 4.6rem)/1 var(--serif); letter-spacing: -0.01em;
+      background: var(--gold-grad); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: sheen 9s ease-in-out infinite; padding-right: 0.06em; }
+    @keyframes sheen { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+    /* A soft shadow keeps the big type clear over a bright sky. */
+    .now .place, .now .temp { filter: drop-shadow(0 2px 22px rgba(7, 7, 8, 0.55)); }
+    .temp-row { display: flex; align-items: flex-end; gap: clamp(10px, 2vw, 24px); margin-top: 6px; }
+    .now .temp { font: 300 clamp(6rem, 21vw, 15rem)/0.86 var(--serif); letter-spacing: -0.04em; color: var(--ivory); font-variant-numeric: lining-nums; }
+    .now .icon { font-size: clamp(2.4rem, 6vw, 4.2rem); line-height: 1; padding-bottom: 0.4em; filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.4)); }
+    .now .summary { margin: 14px 0 0; font-size: clamp(1.02rem, 1.5vw, 1.2rem); color: var(--text); }
+    .range-now { margin-top: 4px; font: 600 0.78rem/1.4 var(--sans); letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); white-space: pre; }
+    .outlook { display: inline-flex; margin: 20px 0 0; padding: 10px 18px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: var(--ivory); font-weight: 600; font-size: 0.92rem; }
+    .updated { margin: 12px 0 0; font-size: 0.8rem; color: var(--muted); }
+
+    .search { display: flex; flex-wrap: wrap; gap: 10px; max-width: 46rem; }
+    .search > div { flex: 1 1 260px; }
+    .search input { width: 100%; min-height: 50px; padding: 0 22px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); color: var(--ivory); font: 500 1rem var(--sans); outline: none; transition: border-color 0.3s, box-shadow 0.3s; }
+    .search input::placeholder { color: var(--muted); }
+    .search input:focus { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(214, 180, 108, 0.15); }
+    .search button { min-height: 50px; padding: 0 22px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); color: var(--ivory); font: 600 0.7rem/1 var(--sans); letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; transition: transform 0.4s var(--ease), border-color 0.3s, color 0.3s; }
+    .search button:hover { border-color: var(--gold); color: var(--gold-hi); transform: translateY(-2px); }
+    .search button.primary { border-color: transparent; color: #0d0a06; background: var(--gold-grad); background-size: 220% 100%; box-shadow: 0 10px 34px -12px rgba(214, 180, 108, 0.55); }
+    .search button.primary:hover { color: #0d0a06; background-position: 100% 0; }
+    .suggestions { display: flex; flex-wrap: wrap; gap: 8px; max-width: 46rem; }
+    .suggestions button { padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--glass-strong); color: var(--ivory); font: 500 0.9rem var(--sans); cursor: pointer; }
+    .suggestions button:hover { border-color: var(--gold); color: var(--gold-hi); }
+    .error { margin: 0; min-height: 1.4em; color: var(--bad); font-size: 0.92rem; }
+    .scroll-cue { position: absolute; right: var(--gutter); bottom: clamp(28px, 6vh, 64px); width: 22px; height: 38px; border: 1px solid var(--line-strong); border-radius: 12px; }
+    .scroll-cue span { position: absolute; left: 50%; top: 7px; width: 2px; height: 7px; margin-left: -1px; border-radius: 1px; background: var(--gold); animation: cue 2s var(--ease) infinite; }
+    @keyframes cue { 0% { opacity: 0; transform: translateY(0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(14px); } }
+
+    /* Sections: glass panels */
+    main { padding: 0 var(--gutter) 40px; display: grid; gap: clamp(20px, 3vw, 32px); max-width: 1180px; margin: 0 auto; }
+    main > * { min-width: 0; } /* a long strip scrolls inside its panel instead of widening the page */
+    .card { padding: clamp(20px, 3.4vw, 40px); border-radius: var(--radius); border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); box-shadow: 0 30px 80px -40px rgba(0, 0, 0, 0.8); }
+    .card h2 { margin: 10px 0 0; font: 300 clamp(2rem, 4.6vw, 3.4rem)/1 var(--serif); color: var(--ivory); letter-spacing: -0.01em; }
+    .card h2 em { font-style: italic; background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 0.06em; }
+    .desc { margin: 12px 0 0; max-width: 60ch; color: var(--muted); }
+    .reveal { opacity: 0; transform: translateY(28px); transition: opacity 1s var(--ease), transform 1s var(--ease); }
+    .reveal.in { opacity: 1; transform: none; }
+
+    .strip { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; margin-top: 22px; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+    .hour { flex: 0 0 84px; text-align: center; padding: 14px 6px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025); transition: border-color 0.3s, transform 0.4s var(--ease); }
+    .hour:hover { border-color: var(--line-strong); transform: translateY(-3px); }
+    .hour .h { font: 600 0.66rem/1 var(--sans); letter-spacing: 0.16em; color: var(--muted); }
+    .hour .i { font-size: 22px; margin: 8px 0 4px; }
+    .hour .t { font: 400 1.5rem/1 var(--serif); color: var(--ivory); font-variant-numeric: tabular-nums; }
+    .hour .r { margin-top: 4px; font-size: 11px; color: var(--gold); font-weight: 600; }
+    .hour .p { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .hour .w { margin-top: 4px; font-size: 10.5px; color: var(--text-secondary); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .arrow { display: inline-block; font-weight: 700; color: var(--gold); }
+
+    .days { display: grid; margin-top: 18px; }
+    .day { display: grid; grid-template-columns: 70px 54px 1fr 70px; gap: 14px; align-items: center; padding: 14px 6px; border-bottom: 1px solid var(--line); }
+    .day:last-child { border-bottom: 0; }
+    .day > span:first-child { font: 500 1.15rem/1.1 var(--serif); color: var(--ivory); }
+    .day > span:first-child small.wind { display: block; margin-top: 3px; font: 500 11px var(--sans); color: var(--muted); white-space: nowrap; }
+    .day .ic { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; font-size: 20px; }
+    .day .ic small { font-size: 11px; color: var(--gold); font-weight: 600; white-space: nowrap; }
+    .day .ic small.mm { color: var(--muted); font-weight: 500; }
+    .day .range { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+    .day .lo { flex: 0 0 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+    .day .track { flex: 1; position: relative; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.07); }
+    .day .bar { position: absolute; inset: 0; background: linear-gradient(90deg, #7fb6d6, #d6b46c 55%, #e98a52); }
+    .day .hi { text-align: right; font: 400 1.25rem/1 var(--serif); color: var(--ivory); font-variant-numeric: tabular-nums; }
+    @media (max-width: 560px) { .day { grid-template-columns: 52px 40px 1fr 46px; gap: 8px; } .day .lo { flex-basis: 2.6em; } }
+
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 12px; margin-top: 22px; }
+    .tile { display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025); transition: border-color 0.3s; }
+    .tile:hover { border-color: var(--line-strong); }
+    .tile h3 { margin: 0; font: 600 0.62rem/1.2 var(--sans); letter-spacing: 0.24em; text-transform: uppercase; color: var(--gold); }
+    .tile .value { font: 400 1.9rem/1.05 var(--serif); color: var(--ivory); font-variant-numeric: tabular-nums; }
+    .tile p { margin: auto 0 0; font-size: 0.84rem; line-height: 1.45; color: var(--text-secondary); }
+    .scale { position: relative; height: 4px; margin: 6px 0; border-radius: 2px; }
+    .scale.uv { background: linear-gradient(90deg, #4ade80, #eab308 30%, #f97316 55%, #ef4444 75%, #a855f7); }
+    .scale.aqi { background: linear-gradient(90deg, #4ade80, #eab308 17%, #f97316 33%, #ef4444 50%, #a855f7 67%, #7f1d1d); }
+    .scale i { position: absolute; top: 50%; width: 11px; height: 11px; border-radius: 50%; background: var(--ivory); border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--gold); transform: translate(-50%, -50%); }
+    .tile svg { width: 100%; max-height: 90px; }
+    .tile svg.sun path { fill: none; stroke: var(--gold); stroke-width: 1.5; stroke-dasharray: 4 4; }
+    .tile svg.sun line, .tile svg.compass line { stroke: var(--line-strong); stroke-width: 1.2; }
+    .tile svg.sun circle { fill: #f6e2b0; stroke: var(--gold); stroke-width: 2; }
+    .tile svg.compass { max-height: 96px; }
+    .tile svg.compass circle { fill: none; stroke: var(--line-strong); stroke-width: 1.2; }
+    .tile svg.compass text { font: 600 9px var(--sans); fill: var(--muted); text-anchor: middle; letter-spacing: 0.1em; }
+    .tile svg.compass path { fill: var(--gold); }
+    .tile svg.compass g line { stroke: var(--gold); stroke-width: 2; }
+
+    /* The globe and the street map */
+    .globe { position: relative; height: clamp(320px, 62vw, 520px); margin-top: 18px; cursor: grab; touch-action: pan-y; user-select: none; border-radius: 16px;
+      background: radial-gradient(circle at 50% 50%, rgba(214, 180, 108, 0.12), transparent 60%); }
+    .globe:active { cursor: grabbing; }
+    .globe canvas { display: block; width: 100%; height: 100%; }
+    .globe canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 16px; }
+    .globe-labels { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+    .globe-labels > div { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform; }
+    .globe-labels > [hidden] { display: none; }
+    .globe-tag { padding: 5px 12px; border-radius: 999px; font: 600 13px/1.3 var(--sans); background: var(--glass-strong); color: var(--ivory); border: 1px solid var(--gold); box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); font-variant-numeric: tabular-nums; }
+    .globe-city { display: flex; align-items: center; gap: 5px; margin: -8px 0 0 -3px; line-height: 16px; font: 600 11.5px var(--sans); color: var(--text); text-shadow: 0 0 4px #000, 0 0 2px #000; }
+    .globe-city::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+    .globe-controls { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .globe-controls button { width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--glass-strong); color: var(--ivory); font: 400 18px/1 var(--sans); cursor: pointer; backdrop-filter: blur(8px); transition: border-color 0.3s, color 0.3s; }
+    .globe-controls button:hover { border-color: var(--gold); color: var(--gold-hi); }
+    .globe.deep > canvas, .globe.deep > .globe-labels, .globe.deep > .globe-controls { visibility: hidden; }
+    .globe[data-loading]::after { content: "Opening the street map…"; position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; background: var(--glass-strong); border: 1px solid var(--line-strong); color: var(--ivory); font-size: 13px; font-weight: 600; }
+    .streets { position: absolute; inset: 0; z-index: 2; border-radius: 16px; overflow: hidden; cursor: grab; font: inherit; background: #0b0d10; }
+    .streets .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.8); }
+    .streets .leaflet-bar a { background: var(--glass-strong); color: var(--ivory); border-bottom-color: var(--line); }
+    .streets .leaflet-bar a:hover { color: var(--gold-hi); }
+    .streets .leaflet-control-attribution { background: rgba(7, 7, 8, 0.7); color: var(--muted); }
+    .streets .leaflet-control-attribution a { color: var(--gold); }
+    .streets .leaflet-control-scale-line { background: rgba(7, 7, 8, 0.6); color: var(--text); border-color: var(--line-strong); }
+    .streets .streets-buttons a { font-size: 16px; line-height: 30px; text-decoration: none; }
+    .streets .streets-pin { pointer-events: none; }
+    .streets .streets-pin > div { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, calc(-100% + 7px)); }
+    .streets .streets-pin .globe-tag { margin-bottom: 8px; white-space: nowrap; }
+    .streets .streets-pin i { width: 14px; height: 14px; border-radius: 50%; background: var(--gold); border: 2px solid var(--ivory); box-shadow: 0 0 0 5px rgba(214, 180, 108, 0.3), 0 1px 4px rgba(0, 0, 0, 0.6); }
+    .caption { margin: 14px 0 0; font-size: 0.84rem; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    footer { position: relative; z-index: 1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 32px var(--gutter) 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.84rem; background: linear-gradient(to top, rgba(7, 7, 8, 0.95), rgba(7, 7, 8, 0.6)); }
+    footer p { margin: 0; }
+    footer a { color: var(--gold-hi); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation-duration: 0.001ms !important; animation-iteration-count: 1 !important;
-        transition-duration: 0.001ms !important;
-      }
+      *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+      .reveal { opacity: 1; transform: none; }
     }
   </style>
-<style id="site-fixes">
-/* site-fixes: shared navigation and accessibility fixes (contrast, skip link, focusable scroll areas) */
-.skip-link { position: absolute; left: 8px; top: -80px; z-index: 10000; padding: 8px 14px; border-radius: 8px; background: var(--text, #0f1216); color: var(--bg, #fff); font-weight: 600; text-decoration: none; }
-.skip-link:focus { top: 8px; left: 8px; }
-.site-crumb { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 14px; font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none; }
-.site-crumb:hover, .site-crumb:focus-visible { color: var(--accent); }
-[data-scroll-focus]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-@media (prefers-color-scheme: dark) { :root { --muted: #9aa1b3; } }
-</style>
-<!-- motion-kit:head v1 -->
-<style>
-/* The skip link was added to every page without a style, so it sat visible in the top corner. Hidden until focused, as intended. */
-.skip-link { position: absolute; left: 12px; top: -64px; z-index: 1000; padding: 8px 14px; border-radius: 8px; background: var(--accent, #2563eb); color: #fff !important; font-weight: 600; text-decoration: none; transition: top .15s ease; }
-.skip-link:focus { top: 12px; }
-/* The generic button:hover rule is as specific as the primary one and comes first, so it
-   replaced the primary gradient with a flat pale fill (white text on light grey). */
-[data-mk-bg].primary:hover:not(:disabled) { background-image: var(--mk-primary-bg) !important; border-color: transparent; }
-html.mk-pre header.top, html.mk-pre main section, html.mk-pre section.card, html.mk-pre .cards > li { opacity: 0; }
-@media (prefers-reduced-motion: reduce) { html.mk-pre * { opacity: 1 !important; } }
-</style>
-<script>(function(){try{if(!(matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)){var r=document.documentElement;r.classList.add('mk-pre');setTimeout(function(){r.classList.remove('mk-pre')},2200)}}catch(e){}})();</script>
-<!-- /motion-kit:head -->
-<!-- fx:v2 -->
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="fx.css">
-<style>:root { --fx-2: #06b6d4; --fx-3: #f59e0b; }</style>
-<!-- /fx:v2 -->
 <!-- og -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Umer Hashmi · projects">
-<meta property="og:title" content="Weather Now — Live Conditions &amp; 7-Day Forecast">
-<meta property="og:description" content="Current conditions, an hourly strip and a seven-day forecast from the keyless Open-Meteo API. No API key, no tracking.">
+<meta property="og:title" content="Weather Now — Live Weather, 10-Day Forecast &amp; a 3D World">
+<meta property="og:description" content="Current conditions, the next 24 hours, a 10-day forecast and air quality from the keyless Open-Meteo API. No API key, no tracking.">
 <meta property="og:url" content="https://umer-78.github.io/weather-now/">
 <meta property="og:image" content="https://umer-78.github.io/weather-now/og.jpg">
-<meta property="og:image:alt" content="Weather Now — Live Conditions &amp; 7-Day Forecast: the live demo">
+<meta property="og:image:alt" content="Weather Now — Live Weather, 10-Day Forecast &amp; a 3D World: the live demo">
 <meta name="twitter:card" content="summary_large_image">
 <!-- /og -->
 </head>
 <body>
-  <noscript><p style="margin:16px;padding:12px 16px;border-radius:8px;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;font-family:system-ui,sans-serif">This interactive demo requires JavaScript. Please enable it to run the demo in your browser.</p></noscript>
-
+  <noscript><p style="position:relative;z-index:2;margin:16px;padding:12px 16px;border-radius:12px;background:#1a1610;color:#f1dcaa;border:1px solid #9c7a3c;font-family:system-ui,sans-serif">This page needs JavaScript for the forecast. Please enable it.</p></noscript>
   <a class="skip-link" href="#main">Skip to content</a>
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <div class="grain" aria-hidden="true"></div>
 
-  <main id="main">
-
-  <div class="wrap">
-    <a class="site-crumb" href="https://umer-78.github.io/">← All projects</a>
-    <header class="top">
-      <span class="fx-eyebrow">Applications &amp; services · JavaScript</span>
-      <div class="brand">
-        <div class="icon" aria-hidden="true">W</div>
-        <div>
-          <h1>Weather Now</h1>
-          <p class="sub">Live conditions and a seven-day forecast — no API key, no tracking.</p>
-        </div>
-      </div>
+  <div class="site">
+    <header class="nav" id="nav">
+      <a class="brand" href="https://umer-78.github.io/" aria-label="All projects by Umer Hashmi"><span class="mono" aria-hidden="true">W</span><span class="brand-name">Weather Now</span></a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#hourlyCard">Hourly</a>
+        <a href="#dailyCard">10 days</a>
+        <a href="#detailsCard">Details</a>
+        <a href="#mapCard">World</a>
+      </nav>
       <div class="actions">
-        <a class="btn" href="https://github.com/umer-78/weather-now">GitHub</a>
+        <a class="btn" href="https://github.com/umer-78/weather-now">GitHub <span aria-hidden="true">↗</span></a>
       </div>
-      <div class="fx-tags" aria-hidden="true"><div><span>javascript</span><span>weather</span><span>open-meteo</span><span>dashboard</span><span>javascript</span><span>weather</span><span>open-meteo</span><span>dashboard</span></div></div>
     </header>
 
-    <form id="searchForm" class="row" autocomplete="off">
-      <div>
-        <label for="place" class="sr-only">Place</label>
-        <input id="place" type="search" placeholder="Search a city — Lahore, Karachi, London…" required>
-      </div>
-      <button class="primary" type="submit">Search</button>
-      <button type="button" id="locate">Use my location</button>
-      <button type="button" id="units" aria-label="Switch units">°C</button>
-    </form>
-    <div id="suggestions" class="suggestions" hidden></div>
-    <p class="error" id="error" role="alert"></p>
-
-    <section class="card current" id="current" hidden>
-      <div class="now">
-        <div class="icon" id="nowIcon">☀️</div>
-        <div>
+    <header class="hero" id="top">
+      <h1 class="sr-only">Weather Now</h1>
+      <p class="eyebrow"><span>Live weather</span> <span class="rule" aria-hidden="true"></span> <span>Anywhere on Earth</span></p>
+      <section class="now" id="current" hidden aria-live="polite">
+        <p class="place" id="nowPlace"></p>
+        <div class="temp-row">
           <div class="temp" id="nowTemp">—</div>
-          <div class="place" id="nowPlace"></div>
-          <div class="muted" id="nowSummary"></div>
+          <div class="icon" id="nowIcon" aria-hidden="true"></div>
         </div>
-      </div>
-      <dl class="facts" id="facts"></dl>
-    </section>
+        <p class="summary" id="nowSummary"></p>
+        <div class="range-now" id="nowRange"></div>
+        <p class="outlook" id="outlook"></p>
+        <p class="updated" id="updated"></p>
+      </section>
 
-    <section class="card" id="hourlyCard" hidden>
-      <h2>Next 12 hours</h2>
-      <div class="strip" id="hourly"></div>
-    </section>
+      <form id="searchForm" class="search" autocomplete="off">
+        <div>
+          <label for="place" class="sr-only">Place</label>
+          <input id="place" type="search" placeholder="Search a city, or type coordinates…" required>
+        </div>
+        <button class="primary" type="submit">Search</button>
+        <button type="button" id="locate">Use my location</button>
+        <button type="button" id="units" aria-label="Switch units">°C</button>
+      </form>
+      <div id="suggestions" class="suggestions" hidden></div>
+      <p class="error" id="error" role="alert"></p>
+      <a class="scroll-cue" href="#hourlyCard" aria-label="Scroll to the forecast"><span></span></a>
+    </header>
 
-    <section class="card" id="dailyCard" hidden>
-      <h2>Seven days</h2>
-      <div class="days" id="daily"></div>
-    </section>
+    <main id="main">
+      <section class="card reveal" id="hourlyCard" hidden>
+        <p class="kicker">The day ahead</p>
+        <h2>Next <em>24 hours</em></h2>
+        <div class="strip" id="hourly"></div>
+      </section>
 
-    <section class="card" id="mapCard" hidden>
-      <h2>World map</h2>
-      <p class="desc">Drag to turn the globe; scroll, pinch or use + and − to zoom, and the map stays sharp as you go in. Click or tap anywhere, or on a city's name, for the weather there.</p>
-      <div class="globe" id="globe"></div>
-      <p class="muted caption" id="globeCaption"></p>
-    </section>
+      <section class="card reveal" id="dailyCard" hidden>
+        <p class="kicker">Ten days</p>
+        <h2>The <em>forecast</em></h2>
+        <div class="days" id="daily"></div>
+      </section>
 
-    <footer>Forecast data from <a href="https://open-meteo.com/">Open-Meteo</a>, free for non-commercial use · Place names for map picks © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Built by <a href="https://github.com/umer-78">Umer Hashmi</a> · <a href="https://github.com/umer-78/weather-now">Source on GitHub</a></footer>
+      <section class="card reveal" id="detailsCard" hidden>
+        <p class="kicker">Right now</p>
+        <h2>The <em>details</em></h2>
+        <div class="tiles" id="tiles"></div>
+      </section>
+
+      <section class="card reveal" id="mapCard" hidden>
+        <p class="kicker">The world</p>
+        <h2>Every <em>place</em></h2>
+        <p class="desc">Drag to turn the globe; scroll, pinch or use + and − to zoom. Keep going and it becomes a street map, down to single houses. Click or tap anywhere, or on a city's name, for the weather there.</p>
+        <div class="globe" id="globe"></div>
+        <p class="caption" id="globeCaption"></p>
+      </section>
+    </main>
+
+    <footer>
+      <p>Forecast and air quality from <a href="https://open-meteo.com/">Open-Meteo</a>, free for non-commercial use · Street map and place names © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors</p>
+      <p>Built by <a href="https://umer-78.github.io/">Umer Hashmi</a> · <a href="https://github.com/umer-78/weather-now">Source on GitHub</a></p>
+    </footer>
   </div>
   <script type="module" src="src/app.js"></script>
+  <script>
+    // The bar firms up once you scroll, and each section rises in as it comes into view.
+    (() => {
+      const nav = document.getElementById('nav');
+      const onScroll = () => nav.classList.toggle('scrolled', scrollY > 40);
+      addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+      const io = 'IntersectionObserver' in window && new IntersectionObserver((entries) => {
+        for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      }, { rootMargin: '0px 0px -8% 0px' });
+      document.querySelectorAll('.reveal').forEach((el) => (io ? io.observe(el) : el.classList.add('in')));
+    })();
+  </script>
 
-  </main>
   <!-- share-link: "Copy link" saves this demo's inputs in the URL (?s=...) so the link reopens with the same result. -->
   <style>
     .share-link-row { display: flex; justify-content: flex-end; margin: 10px 0 0; }
@@ -567,100 +451,5 @@ html.mk-pre header.top, html.mk-pre main section, html.mk-pre section.card, html
       window.addEventListener('resize', soon);
     })();
   </script>
-  
-<!-- motion-kit:body v1 -->
-<script src="https://cdn.jsdelivr.net/npm/motion@13.4.4/dist/motion.js" defer crossorigin="anonymous"></script>
-<script>
-/* Motion layer (motion.dev, the library behind Framer Motion), built from the
-   same component ideas as the Magic UI set on 21st.dev: Blur Fade reveals, a
-   Number Ticker for changing figures, a press spring for buttons and an
-   animated list for new results. Progressive: without the library, or with
-   reduced motion, the page is exactly as before. */
-(function () {
-  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var root = document.documentElement;
-  var EASE = [0.16, 1, 0.3, 1];
-  function keepPrimaryColour() {
-    document.querySelectorAll('button.primary, .btn.primary').forEach(function (b) {
-      var bg = getComputedStyle(b).backgroundImage;
-      if (bg && bg !== 'none') { b.style.setProperty('--mk-primary-bg', bg); b.setAttribute('data-mk-bg', ''); }
-    });
-  }
-  function start() {
-    keepPrimaryColour();
-    var M = window.Motion;
-    if (reduce || !M || !M.animate) { root.classList.remove('mk-pre'); return; }
-    var animate = M.animate, inView = M.inView, stagger = M.stagger;
-    var seen = new WeakSet();
-    function blurFade(el, delay) {
-      // Elements that already have a CSS entrance animation keep it; running
-      // both made them fade in, vanish and fade in again.
-      if (seen.has(el) || (el.className && /\banimate-in\b/.test(el.className)) || getComputedStyle(el).animationName !== 'none') return;
-      seen.add(el);
-      el.style.opacity = '0';
-      animate(el, { opacity: [0, 1], transform: ['translateY(14px)', 'translateY(0px)'], filter: ['blur(6px)', 'blur(0px)'] },
-        { duration: 0.6, delay: delay || 0, ease: EASE }).finished.then(function () { el.style.filter = ''; el.style.transform = ''; });
-    }
-    // 1. Blur Fade: header first, then each card as it scrolls into view.
-    var top = document.querySelectorAll('header.top, header.hero .hero-inner > *, .page-head');
-    top.forEach(function (el, i) { blurFade(el, i * 0.06); });
-    var cards = document.querySelectorAll('main section, section.card, .card, .cards > li, [data-reveal]');
-    var inFirstScreen = [];
-    cards.forEach(function (el) {
-      if (el.closest('header') || el.parentElement && el.parentElement.closest('.card')) return;
-      var r = el.getBoundingClientRect();
-      if (r.top < innerHeight) inFirstScreen.push(el);
-      else if (getComputedStyle(el).animationName === 'none') { el.style.opacity = '0'; inView(el, function () { blurFade(el, 0); }, { amount: 0.12 }); }
-    });
-    inFirstScreen.forEach(function (el, i) { blurFade(el, 0.12 + i * 0.07); });
-    root.classList.remove('mk-pre');
-
-    // 2. Number Ticker: figures in stat tiles count to their new value.
-    var NUM = /-?\d[\d,]*(?:\.\d+)?/;
-    function tick(el, from, to, text) {
-      var m = text.match(NUM), dec = (m[0].split('.')[1] || '').length, pre = text.slice(0, m.index), post = text.slice(m.index + m[0].length);
-      var comma = m[0].indexOf(',') >= 0;
-      el.__mkLock = true;
-      if (el.__mkAnim) el.__mkAnim.stop();
-      el.__mkAnim = animate(from, to, { duration: 0.8, ease: EASE, onUpdate: function (v) {
-        var s = comma ? v.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) : v.toFixed(dec);
-        el.textContent = pre + s + post;
-      } });
-      el.__mkAnim.finished.then(function () { el.textContent = text; el.__mkLock = false; });
-    }
-    function num(t) { var m = t && t.match(NUM); return m ? parseFloat(m[0].replace(/,/g, '')) : null; }
-    var tickers = document.querySelectorAll('.stat .v, .stats .v, .stat-value, [data-ticker]');
-    tickers.forEach(function (el) {
-      el.__mkLast = num(el.textContent);
-      new MutationObserver(function () {
-        if (el.__mkLock) return;
-        var text = el.textContent, to = num(text), from = el.__mkLast;
-        el.__mkLast = to;
-        if (to === null || from === null || from === to || el.children.length) return;
-        tick(el, from, to, text);
-      }).observe(el, { childList: true, characterData: true, subtree: true });
-    });
-
-    // 3. Press spring on every button.
-    document.addEventListener('pointerdown', function (e) {
-      var b = e.target.closest && e.target.closest('button, .btn, [role="button"]');
-      if (b && !b.disabled) animate(b, { transform: ['scale(1)', 'scale(0.96)', 'scale(1)'] }, { duration: 0.28, ease: EASE });
-    }, { passive: true });
-
-    // 4. Animated list: new results slide in instead of popping.
-    var lists = document.querySelectorAll('main ul, main ol, main tbody, .results, [data-animate-list]');
-    lists.forEach(function (list) {
-      new MutationObserver(function (muts) {
-        var added = [];
-        muts.forEach(function (m) { m.addedNodes.forEach(function (n) { if (n.nodeType === 1 && added.length < 24) added.push(n); }); });
-        if (added.length) animate(added, { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { duration: 0.35, delay: stagger(0.03), ease: EASE });
-      }).observe(list, { childList: true });
-    });
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
-})();
-</script>
-<!-- /motion-kit:body -->
-<!-- fx:v2 --><script type="module" src="fx.js"></script><!-- /fx:v2 -->
 </body>
 </html>
