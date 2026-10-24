@@ -103,7 +103,15 @@
       .hero::before { background: linear-gradient(to top, rgba(7, 7, 8, 0.94), rgba(7, 7, 8, 0.62) 58%, rgba(7, 7, 8, 0.3)); }
     }
     .eyebrow .rule { width: 46px; height: 1px; background: var(--line-strong); }
-    .now { max-width: 60rem; }
+    .now { max-width: 60rem; transform-origin: 0 100%;
+      transform: translateY(calc(var(--hero-scroll, 0) * -90px)) scale(calc(1 - var(--hero-scroll, 0) * 0.08)); opacity: calc(1 - var(--hero-scroll, 0) * 1.1); }
+    .hero .eyebrow { transform: translate3d(calc(var(--px, 0) * -10px), calc(var(--py, 0) * -8px), 0); transition: transform 0.6s var(--ease); }
+    .now .place { transform: translate3d(calc(var(--px, 0) * -18px), calc(var(--py, 0) * -12px), 0); transition: transform 0.6s var(--ease); }
+    .now .temp-row { transform: translate3d(calc(var(--px, 0) * -32px), calc(var(--py, 0) * -22px), 0); transition: transform 0.6s var(--ease); }
+    .now .icon { animation: bob 6s ease-in-out infinite; }
+    @keyframes bob { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-12px) rotate(3deg); } }
+    .progress { position: fixed; left: 0; top: 0; z-index: 70; width: 100%; height: 2px; transform-origin: 0 50%; transform: scaleX(0); background: var(--gold-grad); pointer-events: none; }
+    .search button:active, .btn:active { transform: translateY(1px) scale(0.98); transition-duration: 0.08s; }
     .now .place { margin: 18px 0 0; font: 600 clamp(1.8rem, 4.6vw, 3.4rem)/1.1 var(--sans); letter-spacing: -0.025em;
       background: var(--gold-grad); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: sheen 9s ease-in-out infinite; padding-right: 0.06em; }
     @keyframes sheen { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
@@ -142,12 +150,35 @@
     .card h2 { margin: 10px 0 0; font: 600 clamp(1.6rem, 3.4vw, 2.4rem)/1.1 var(--sans); color: var(--ivory); letter-spacing: -0.03em; }
     .card h2 em { font-style: normal; background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .desc { margin: 12px 0 0; max-width: 60ch; color: var(--muted); }
-    .reveal { opacity: 0; transform: translateY(28px); transition: opacity 1s var(--ease), transform 1s var(--ease); }
-    .reveal.in { opacity: 1; transform: none; }
+    /* 3D: a panel swings up into place as it scrolls into view, then tilts towards the pointer
+       (src/depth.js sets --rx/--ry, and --gx/--gy for the glint that follows it round the edge). */
+    .card { position: relative; transform-origin: 50% 70%;
+      transform: perspective(1400px) translate3d(0, var(--ey, 0px), var(--ez, 0px)) rotateX(calc(var(--ex, 0deg) + var(--rx, 0deg))) rotateY(var(--ry, 0deg));
+      transition: transform 0.9s var(--ease), opacity 0.9s var(--ease), box-shadow 0.4s; }
+    .reveal { opacity: 0; --ey: 80px; --ez: -160px; --ex: 16deg; }
+    .reveal.in { opacity: 1; --ey: 0px; --ez: 0px; --ex: 0deg; }
+    .card[data-flat] { transform: none; } /* a map never tilts: a click must land where it looks */
+    .card.lit, .tile.lit { transition-duration: 0.2s, 0.9s, 0.4s; }
+    .card.lit { box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(214, 180, 108, 0.12); }
+    .card::after, .tile::after {
+      content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; opacity: 0; transition: opacity 0.5s;
+      background: radial-gradient(420px circle at var(--gx, 50%) var(--gy, 50%), rgba(241, 220, 170, 0.8), transparent 45%);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+    }
+    .card::before, .tile::before {
+      content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 0.5s;
+      background: radial-gradient(640px circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 244, 220, 0.06), transparent 42%);
+    }
+    .lit::after, .lit::before { opacity: 1; }
 
     .strip { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; margin-top: 22px; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
-    .hour { flex: 0 0 84px; text-align: center; padding: 14px 6px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025); transition: border-color 0.3s, transform 0.4s var(--ease); }
-    .hour:hover { border-color: var(--line-strong); transform: translateY(-3px); }
+    .hour { flex: 0 0 84px; text-align: center; padding: 14px 6px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025);
+      transform: perspective(900px) translateZ(var(--cz, 0px)) rotateY(var(--cy, 0deg)) translateY(var(--lift, 0px)); opacity: var(--co, 1);
+      transition: transform 0.3s var(--ease), border-color 0.3s, opacity 0.3s; }
+    .hour:hover { border-color: var(--line-strong); --lift: -6px; }
+    .strip { cursor: grab; }
+    .strip.dragging { cursor: grabbing; user-select: none; }
+    .strip.dragging .hour { pointer-events: none; transition-duration: 0s; }
     .hour .h { font: 600 0.66rem/1 var(--sans); letter-spacing: 0.16em; color: var(--muted); }
     .hour .i { font-size: 22px; margin: 8px 0 4px; }
     .hour .t { font: 500 1.25rem/1 var(--sans); color: var(--ivory); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
@@ -157,7 +188,8 @@
     .arrow { display: inline-block; font-weight: 700; color: var(--gold); }
 
     .days { display: grid; margin-top: 18px; }
-    .day { display: grid; grid-template-columns: 70px 54px 1fr 70px; gap: 14px; align-items: center; padding: 14px 6px; border-bottom: 1px solid var(--line); }
+    .day { display: grid; grid-template-columns: 70px 54px 1fr 70px; gap: 14px; align-items: center; padding: 14px 6px; border-bottom: 1px solid var(--line); border-radius: 10px; transition: transform 0.4s var(--ease), background 0.3s; }
+    .day:hover { background: rgba(214, 180, 108, 0.05); transform: translateX(6px); }
     .day:last-child { border-bottom: 0; }
     .day > span:first-child { font: 600 1rem/1.2 var(--sans); color: var(--ivory); }
     .day > span:first-child small.wind { display: block; margin-top: 3px; font: 500 11px var(--sans); color: var(--muted); white-space: nowrap; }
@@ -172,8 +204,15 @@
     @media (max-width: 560px) { .day { grid-template-columns: 52px 40px 1fr 46px; gap: 8px; } .day .lo { flex-basis: 2.6em; } }
 
     .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 12px; margin-top: 22px; }
-    .tile { display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025); transition: border-color 0.3s; }
+    .tile { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025);
+      transform: perspective(700px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transform-style: preserve-3d;
+      transition: transform 0.7s var(--ease), border-color 0.3s, box-shadow 0.4s; }
     .tile:hover { border-color: var(--line-strong); }
+    .tile.lit { box-shadow: 0 26px 44px -22px rgba(0, 0, 0, 0.85); }
+    .tile > h3 { transform: translateZ(14px); }
+    .tile > .value { transform: translateZ(36px); }
+    .tile > svg, .tile > .scale { transform: translateZ(24px); }
+    .tile > p { transform: translateZ(10px); }
     .tile h3 { margin: 0; font: 600 0.62rem/1.2 var(--sans); letter-spacing: 0.24em; text-transform: uppercase; color: var(--gold); }
     .tile .value { font: 600 1.5rem/1.15 var(--sans); color: var(--ivory); letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
     .tile p { margin: auto 0 0; font-size: 0.84rem; line-height: 1.45; color: var(--text-secondary); }
@@ -229,7 +268,7 @@
 
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
-      .reveal { opacity: 1; transform: none; }
+      .reveal { opacity: 1; --ey: 0px; --ez: 0px; --ex: 0deg; }
     }
   </style>
 <!-- og -->
@@ -311,7 +350,7 @@
         <div class="tiles" id="tiles"></div>
       </section>
 
-      <section class="card reveal" id="mapCard" hidden>
+      <section class="card reveal" id="mapCard" data-flat hidden>
         <p class="kicker">The world</p>
         <h2>Every <em>place</em></h2>
         <p class="desc">Drag to turn the globe; scroll, pinch or use + and − to zoom. Keep going and it becomes a street map, down to single houses. Click or tap anywhere, or on a city's name, for the weather there.</p>
@@ -326,6 +365,7 @@
     </footer>
   </div>
   <script type="module" src="src/app.js"></script>
+  <script type="module" src="src/depth.js"></script>
   <script>
     // The bar firms up once you scroll, and each section rises in as it comes into view.
     (() => {
@@ -335,7 +375,7 @@
       onScroll();
       const io = 'IntersectionObserver' in window && new IntersectionObserver((entries) => {
         for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
-      }, { rootMargin: '0px 0px -8% 0px' });
+      }, { rootMargin: '0px 0px 12% 0px' }); // a panel enters a little before it is reached, as it starts lower and further back
       document.querySelectorAll('.reveal').forEach((el) => (io ? io.observe(el) : el.classList.add('in')));
     })();
   </script>
