@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { skyMood } from '../src/mood.js';
+import { skyMood, sunElevation } from '../src/mood.js';
 
 const day = { time: '2026-10-16T12:00', is_day: 1 };
 const sun = { sunrise: '2026-10-16T06:00', sunset: '2026-10-16T18:00' };
@@ -31,4 +31,18 @@ test('night, golden hour and the wind', () => {
   assert.equal(skyMood({ ...day, time: '2026-10-16T17:30', weather_code: 0 }, sun).golden, true);
   assert.equal(skyMood({ ...day, weather_code: 0 }, sun).golden, false);
   assert.deepEqual(skyMood({ ...day, weather_code: 0, wind_speed_10m: 22, wind_direction_10m: 90 }, sun).wind, { speed: 22, direction: 90 });
+});
+
+test('the sun stands as high as it really does there', () => {
+  // the equator at an equinox: overhead at noon
+  assert.ok(Math.abs(sunElevation(0.5, 0, 80) - 90) < 2);
+  // Lahore, 31.5°N: about 82° at noon in late June, about 35° in late December
+  assert.ok(Math.abs(sunElevation(0.5, 31.5, 172) - 82) < 1.5);
+  assert.ok(Math.abs(sunElevation(0.5, 31.5, 355) - 35) < 1.5);
+  // on the horizon at sunrise and sunset, and nothing to show without a place or a day
+  assert.equal(sunElevation(0, 31.5, 172), 0);
+  assert.ok(sunElevation(1, 31.5, 172) < 1e-9);
+  assert.equal(sunElevation(null, 31.5, 172), null);
+  const mood = skyMood({ time: '2026-06-21T12:30', is_day: 1, weather_code: 0 }, { sunrise: '2026-06-21T05:00', sunset: '2026-06-21T19:10', latitude: 31.5 });
+  assert.ok(mood.elevation > 75 && mood.elevation < 84, String(mood.elevation));
 });

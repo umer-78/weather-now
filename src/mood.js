@@ -8,8 +8,23 @@ const STORM = new Set([95, 96, 99]);
 const FOG = new Set([45, 48]);
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
+/** How high the sun stands, in degrees above the horizon, `progress` of the way from
+ *  sunrise (0) to sunset (1) at a latitude on a day of the year: its noon height comes
+ *  from the latitude and the season's declination, and it follows a smooth arc to it. */
+export function sunElevation(progress, latitude, dayOfYear) {
+  if (progress == null || latitude == null || dayOfYear == null) return null;
+  const declination = 23.44 * Math.sin((2 * Math.PI * (284 + dayOfYear)) / 365);
+  const noon = 90 - Math.abs(latitude - declination);
+  return Math.max(0, noon) * Math.sin(Math.PI * Math.max(0, Math.min(1, progress)));
+}
+
+const dayOfYear = (date) => {
+  const [y, m, d] = String(date).slice(0, 10).split('-').map(Number);
+  return y && m && d ? Math.round((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 0)) / 86400000) : null;
+};
+
 /** `current` is Open-Meteo's current block; `sunrise`/`sunset` today's local times. */
-export function skyMood(current, { sunrise, sunset } = {}) {
+export function skyMood(current, { sunrise, sunset, latitude } = {}) {
   const code = current?.weather_code;
   const mood = STORM.has(code) ? 'storm' : SNOW.has(code) ? 'snow' : RAIN.has(code) ? 'rain'
     : FOG.has(code) ? 'fog' : code >= 2 ? 'cloudy' : 'clear';
@@ -28,6 +43,8 @@ export function skyMood(current, { sunrise, sunset } = {}) {
     // The first and last hour or so of daylight are gold.
     golden: sun != null && (sun < 0.1 || sun > 0.9),
     sun,
+    // degrees above the horizon, for a sky lit as it really is there and then
+    elevation: sunElevation(sun, latitude, dayOfYear(current?.time)),
     clouds,
     rain: wet ? Math.max(amount, mood === 'storm' ? 0.6 : 0.3) : 0,
     snow: mood === 'snow' ? Math.max(amount * 2, 0.35) : 0,
