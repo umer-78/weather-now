@@ -19,16 +19,22 @@ No framework, no build step, no tracking.
 
 ## Features
 
-- **A real 3D sky, as it looks there now.** Behind the page is the sky over the
-  place on screen, drawn with three.js's physically based model of sunlight in
-  the air: the sun stands at its real height for that latitude, date and hour,
-  so the blue, the haze and a sunset's reds are what you would see. Sunlit
-  clouds thicken with the cloud cover and drift with the real wind; a full deck
-  turns grey and darker under rain. Rain falls as hard as it is falling there
-  and leans with the wind, snow drifts, storms throw forked lightning, mist
-  hangs over distant hills when visibility drops, and at night there are stars
-  and the moon in its real phase. Without WebGL the page keeps a still gradient
-  in the same mood.
+- **A real 3D sky, as it looks there now, seen through a window.** Behind the
+  page is the sky over the place on screen, drawn with three.js's physically
+  based model of sunlight in the air. The sun stands at its real height for
+  that latitude, date and minute and crosses the view as the day goes on, then
+  sinks through a long dusk; the moon rises and sets on its own hours in its
+  real phase, among the stars. Sunlit clouds thicken with the cloud cover and
+  drift with the real wind, pushed on by its gusts; a full deck turns grey and
+  darker under rain. Rain falls as hard as it is falling there, leans with the
+  wind, and beads and runs down the glass; snow drifts and settles on the
+  hills; storms throw forked lightning; mist hangs over the hills when
+  visibility drops. The temperature shows too: a hot day hazes and shimmers, a
+  freezing one frosts the window. Without WebGL the page keeps a still
+  gradient in the same mood.
+- **Any hour in the sky.** Point at an hour of the next 24, or a day of the ten
+  (or tap it), and the sky shows that hour: the sun where it will be, and the
+  clouds, rain, wind and warmth forecast. Esc or "Now" comes back.
 - **Designed like the [portfolio](https://umer-78.github.io/)**: obsidian, ivory
   and champagne gold, glass panels and film grain, set in Inter: a clean sans
   close to the San Francisco font of Apple's weather app, with a thin, large
@@ -64,7 +70,7 @@ No framework, no build step, no tracking.
 Node's runner:
 
 ```bash
-node --test      # 39 tests
+node --test      # 42 tests
 ```
 
 Covering the WMO weather-code table, temperature conversion and rounding,
