@@ -5,7 +5,7 @@ import {
   airQuery, aqiLevel, moonPhase, pressureTrend, visibilityNote, feelsNote, sunProgress,
 } from './weather.js';
 import { coordinateLabel, parseCoordinates } from './geo.js';
-import { skyMood } from './mood.js';
+import { skyMood, hourConditions, sunTimes } from './mood.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -19,6 +19,9 @@ const state = {
 };
 let globe = null;
 let sky = null;
+// An hour of the forecast shown in the sky instead of now: its local time, its
+// conditions, and whether it was chosen (it stays) or only pointed at.
+let preview = null;
 
 function load(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function save(key, value) { try { localStorage.setItem(key, value); } catch { /* private mode */ } }
@@ -114,6 +117,7 @@ function showUnit() {
 function render() {
   const { data, place, unit } = state;
   if (!data) return;
+  if (preview && !data.hourly?.time?.includes(preview.at)) { preview = null; $('skyAt').hidden = true; } // a new place, or that hour has gone
   const current = data.current;
   const days = dailyFromResponse(data.daily);
   const { icon } = describeCode(current.weather_code, current.is_day);
@@ -128,7 +132,7 @@ function render() {
   $('updated').textContent = current.time ? `Updated ${current.time.slice(11, 16)} ${data.timezone_abbreviation ?? ''} local time` : '';
 
   $('hourly').innerHTML = nextHours(data.hourly, current.time, 24).map((hour) => `
-    <div class="hour">
+    <div class="hour" data-at="${esc(hour.time)}">
       <div class="h">${esc(hour.label)}</div>
       <div class="i">${describeCode(hour.code, hour.isDay).icon}</div>
       <div class="t">${formatTemperature(hour.temperature, unit)}</div>
@@ -143,7 +147,7 @@ function render() {
     // Every bar is drawn on the same track, so bars compare across days.
     const { left, right } = rangeBar(day.min, day.max, coldest, hottest);
     return `
-    <div class="day">
+    <div class="day" data-at="${esc(day.date)}T13:00">
       <span>${i === 0 ? 'Today' : esc(day.weekday)}${day.wind == null ? '' : `<small class="wind" title="Strongest wind${
         day.gusts == null ? '' : `, gusts to ${esc(formatWind(day.gusts, unit))}`}">${arrow(day.windDirection)} ${esc(formatWind(day.wind, unit))}</small>`}</span>
       <span class="ic" title="${esc(describeCode(day.code).text)}">${describeCode(day.code).icon}${
@@ -158,7 +162,8 @@ function render() {
   }).join('');
 
   $('tiles').innerHTML = tiles(data, days, outlook, unit);
-  paintSky();
+  if (preview) showHour(preview.at, preview.chosen); // marks the new cards, in the unit now in use
+  else paintSky();
   for (const id of ['current', 'hourlyCard', 'dailyCard', 'detailsCard']) $(id).hidden = false;
 
   $('globeCaption').textContent = caption(place, data);
@@ -169,15 +174,83 @@ function render() {
   document.title = `${formatTemperature(current.temperature_2m, unit)} ${placeLabel(place)} — Weather Now`;
 }
 
-/** The sky behind the page shows the weather here: drawn in 3D when it can be, and as a
- *  gradient in the same mood (data-mood) when it cannot. */
+/** The sky behind the page shows the weather here (or at the hour chosen): drawn in 3D
+ *  when it can be, and as a gradient in the same mood (data-mood) when it cannot. */
 function paintSky() {
   const { data } = state;
   if (!data) return;
-  const mood = skyMood(data.current, { sunrise: data.daily?.sunrise?.[0], sunset: data.daily?.sunset?.[0] });
+  const conditions = preview?.conditions ?? liveConditions(data);
+  const when = new Date(`${conditions.time}Z`);
+  const phase = moonPhase(Number.isNaN(+when) ? new Date() : when);
+  const mood = skyMood(conditions, { ...sunTimes(data.daily, conditions.time), latitude: state.place?.latitude, moonAge: phase.age });
   document.documentElement.dataset.mood = mood.night ? 'night' : mood.golden && mood.mood === 'clear' ? 'golden' : mood.mood;
-  sky?.set(mood, moonPhase(new Date()));
+  sky?.set(mood, phase);
 }
+
+/** The conditions now, at the minute: the forecast's current block keeps its 15-minute
+ *  time, so the place's own clock moves the sun on between updates. */
+function liveConditions(data) {
+  const { current } = data;
+  if (data.utc_offset_seconds == null || !current?.time) return current;
+  const time = new Date(Date.now() + data.utc_offset_seconds * 1000).toISOString().slice(0, 16);
+  // The clock is trusted only while it agrees with the forecast's own "now".
+  const ahead = (Date.parse(`${time}Z`) - Date.parse(`${current.time}Z`)) / 60000;
+  if (!(ahead > 0 && ahead < 90)) return current;
+  const { sunrise, sunset } = sunTimes(data.daily, time);
+  return { ...current, time, is_day: sunProgress(time, sunrise, sunset) == null ? 0 : 1 };
+}
+setInterval(() => { if (!preview && !document.hidden) paintSky(); }, 60 * 1000);
+
+// Point at an hour of the strip or a day of the forecast, or tap it, and the sky shows
+// that hour: the sun where it will be, and the clouds, rain, wind and warmth forecast.
+function showHour(at, chosen) {
+  const { data, unit } = state;
+  const i = data?.hourly?.time?.indexOf(at) ?? -1;
+  if (i < 0) return;
+  const conditions = hourConditions(data.hourly, i);
+  preview = { at, chosen, conditions };
+  const { icon, text } = describeCode(conditions.weather_code, conditions.is_day);
+  const weekday = new Date(`${at}:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+  $('skyAt').innerHTML = `<span>${icon} The sky ${esc(weekday)} ${esc(at.slice(11, 16))}: ${esc(text)}, ${esc(formatTemperature(conditions.temperature_2m, unit))}</span><b>Now ✕</b>`;
+  $('skyAt').hidden = false;
+  markPreview();
+  paintSky();
+}
+function backToNow() {
+  if (!preview) return;
+  preview = null;
+  $('skyAt').hidden = true;
+  markPreview();
+  paintSky();
+}
+function markPreview() {
+  for (const el of document.querySelectorAll('[data-at].on')) el.classList.remove('on');
+  if (preview) for (const el of document.querySelectorAll(`[data-at="${preview.at}"]`)) el.classList.add('on');
+}
+let leaving = 0;
+let pressed = null;
+for (const list of [$('hourly'), $('daily')]) {
+  list.addEventListener('pointerover', (e) => {
+    if (e.pointerType !== 'mouse' || preview?.chosen) return;
+    const at = e.target.closest('[data-at]')?.dataset.at;
+    if (!at) return;
+    clearTimeout(leaving);
+    if (preview?.at !== at) showHour(at, false);
+  });
+  list.addEventListener('pointerleave', (e) => {
+    if (e.pointerType === 'mouse' && preview && !preview.chosen) leaving = setTimeout(backToNow, 300);
+  });
+  list.addEventListener('pointerdown', (e) => { pressed = { x: e.clientX, y: e.clientY }; });
+  list.addEventListener('click', (e) => {
+    const at = e.target.closest('[data-at]')?.dataset.at;
+    // a drag or a swipe along the strip is not a choice
+    if (!at || (pressed && Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) > 8)) return;
+    if (preview?.chosen && preview.at === at) backToNow();
+    else showHour(at, true);
+  });
+}
+$('skyAt').addEventListener('click', backToNow);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') backToNow(); });
 
 /** A small arrow pointing the way the wind blows (it is named for where it comes from). */
 function arrow(degrees) {

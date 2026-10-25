@@ -19,15 +19,26 @@ No framework, no build step, no tracking.
 
 ## Features
 
-- **A 3D sky that is the weather.** Behind the page, a three.js scene shows the
-  weather at the place on screen: the sky's colour follows the time of day, the
-  sun crosses on its arc and the moon shows its real phase among the stars,
-  clouds gather with the cloud cover and drift with the real wind, rain and snow
-  fall as hard as they are falling there, storms flash, and poor visibility hangs
-  as mist. Golden hour turns the horizon gold. Without WebGL the page keeps a
-  still gradient in the same mood.
+- **A real 3D sky, as it looks there now, seen through a window.** Behind the
+  page is the sky over the place on screen, drawn with three.js's physically
+  based model of sunlight in the air. The sun stands at its real height for
+  that latitude, date and minute and crosses the view as the day goes on, then
+  sinks through a long dusk; the moon rises and sets on its own hours in its
+  real phase, among the stars. Sunlit clouds thicken with the cloud cover and
+  drift with the real wind, pushed on by its gusts; a full deck turns grey and
+  darker under rain. Rain falls as hard as it is falling there, leans with the
+  wind, and beads and runs down the glass; snow drifts and settles on the
+  hills; storms throw forked lightning; mist hangs over the hills when
+  visibility drops. The temperature shows too: a hot day hazes and shimmers, a
+  freezing one frosts the window. Without WebGL the page keeps a still
+  gradient in the same mood.
+- **Any hour in the sky.** Point at an hour of the next 24, or a day of the ten
+  (or tap it), and the sky shows that hour: the sun where it will be, and the
+  clouds, rain, wind and warmth forecast. Esc or "Now" comes back.
 - **Designed like the [portfolio](https://umer-78.github.io/)**: obsidian, ivory
-  and champagne gold, Cormorant Garamond and Manrope, glass panels and film grain
+  and champagne gold, glass panels and film grain, set in Inter: a clean sans
+  close to the San Francisco font of Apple's weather app, with a thin, large
+  temperature
 - City search with disambiguation (three Lahores? pick the right one), typed
   coordinates (`31.56, 74.35`), and "use my location" through the browser's
   geolocation — high accuracy, named with the town it found, and a warning when
@@ -59,7 +70,7 @@ No framework, no build step, no tracking.
 Node's runner:
 
 ```bash
-node --test      # 38 tests
+node --test      # 42 tests
 ```
 
 Covering the WMO weather-code table, temperature conversion and rounding,
@@ -99,8 +110,7 @@ python3 -m http.server 8080
 - The sky (`src/sky.js`) renders at a capped resolution, steps down on devices
   that cannot keep up, pauses when the tab is hidden and holds still for reduced
   motion; `src/mood.js` decides what it shows, and is tested.
-- Fonts are Cormorant Garamond and Manrope (SIL Open Font License, in
-  `assets/fonts`), the same files as the portfolio.
+- The font is Inter (SIL Open Font License, `assets/fonts`), served with the page.
 - The street map is OpenStreetMap's own map, drawn with [Leaflet](https://leafletjs.com/)
   and loaded only when you first zoom in that far. Air quality comes from
   Open-Meteo's air-quality service; if it does not answer, the page leaves that
