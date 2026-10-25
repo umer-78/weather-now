@@ -12,17 +12,13 @@
   <meta name="description" content="Current conditions, the next 24 hours, a 10-day forecast and air quality from the keyless Open-Meteo API. No API key, no tracking.">
   <meta name="theme-color" content="#070708">
   <meta name="color-scheme" content="dark">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23f6e7c1'/><stop offset='.5' stop-color='%23d6b46c'/><stop offset='1' stop-color='%23a8843f'/></linearGradient></defs><rect width='32' height='32' rx='16' fill='%23070708'/><circle cx='16' cy='16' r='15' fill='none' stroke='url(%23g)' stroke-width='1.2'/><text x='16' y='21.5' text-anchor='middle' font-family='Georgia,serif' font-size='16' fill='url(%23g)'>W</text></svg>">
-  <link rel="preload" href="assets/fonts/cormorant-garamond.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="assets/fonts/manrope.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23f6e7c1'/><stop offset='.5' stop-color='%23d6b46c'/><stop offset='1' stop-color='%23a8843f'/></linearGradient></defs><rect width='32' height='32' rx='16' fill='%23070708'/><circle cx='16' cy='16' r='15' fill='none' stroke='url(%23g)' stroke-width='1.2'/><text x='16' y='21.5' text-anchor='middle' font-family='Helvetica,Arial,sans-serif' font-weight='600' font-size='15' fill='url(%23g)'>W</text></svg>">
+  <link rel="preload" href="assets/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin>
   <style>
-    @font-face { font-family: 'Cormorant Garamond'; src: url('assets/fonts/cormorant-garamond.woff2') format('woff2'); font-weight: 300 500; font-style: normal; font-display: swap; }
-    @font-face { font-family: 'Cormorant Garamond'; src: url('assets/fonts/cormorant-garamond-italic.woff2') format('woff2'); font-weight: 300 500; font-style: italic; font-display: swap; }
-    @font-face { font-family: 'Manrope'; src: url('assets/fonts/manrope.woff2') format('woff2'); font-weight: 200 800; font-style: normal; font-display: swap; }
+    /* Inter: a clean, very legible sans, close to the San Francisco font of Apple's own weather app. */
+    @font-face { font-family: 'Inter'; src: url('assets/fonts/inter-variable.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: swap; }
 
     /* One dark theme, as in the portfolio: obsidian, ivory and champagne gold, glass over a live sky. */
-    /* The serif's figures are old-style by default; numbers here read better level. */
-    .hour .t, .day .hi, .day > span:first-child, .tile .value { font-variant-numeric: lining-nums tabular-nums; }
     :root {
       --bg: #070708;
       --glass: rgba(10, 9, 9, 0.58);
@@ -38,8 +34,7 @@
       --line: rgba(214, 180, 108, 0.16);
       --line-strong: rgba(214, 180, 108, 0.4);
       --bad: #f19c8c;
-      --serif: 'Cormorant Garamond', 'Cormorant', Garamond, 'Times New Roman', serif;
-      --sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
       --ease: cubic-bezier(0.16, 1, 0.3, 1);
       --gutter: clamp(16px, 4vw, 56px);
       --radius: 18px;
@@ -85,8 +80,8 @@
     .nav { position: fixed; inset: 0 0 auto; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px var(--gutter); border-bottom: 1px solid transparent; transition: background 0.5s, border-color 0.5s, padding 0.5s var(--ease); }
     .nav.scrolled { padding-block: 12px; background: rgba(7, 7, 8, 0.62); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3); border-bottom-color: var(--line); }
     .brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ivory); }
-    .mono { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--line-strong); border-radius: 50%; font: 400 1rem/1 var(--serif); letter-spacing: 0.08em; color: var(--gold-hi); }
-    .brand-name { font: 500 1.2rem/1 var(--serif); letter-spacing: 0.04em; }
+    .mono { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--line-strong); border-radius: 50%; font: 600 1rem/1 var(--sans); color: var(--gold-hi); }
+    .brand-name { font: 600 1.05rem/1 var(--sans); letter-spacing: -0.01em; }
     .nav-links { display: flex; gap: clamp(14px, 2.4vw, 34px); }
     .nav-links a { font: 600 0.68rem/1 var(--sans); letter-spacing: 0.26em; text-transform: uppercase; text-decoration: none; color: var(--text-secondary); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5); transition: color 0.3s; }
     .nav-links a:hover { color: var(--gold-hi); }
@@ -100,7 +95,7 @@
     /* Hero: the place and its weather, large, over the sky */
     .hero { position: relative; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: flex-end; gap: 22px; padding: 120px var(--gutter) clamp(28px, 6vh, 64px); }
     .hero::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-      background: radial-gradient(ellipse 72% 82% at 0% 100%, rgba(7, 7, 8, 0.9), rgba(7, 7, 8, 0.55) 52%, transparent 78%), linear-gradient(to top, rgba(7, 7, 8, 0.92), transparent 40%); }
+      background: radial-gradient(ellipse 80% 95% at 0% 100%, rgba(7, 7, 8, 0.92), rgba(7, 7, 8, 0.66) 50%, rgba(7, 7, 8, 0.22) 75%, transparent 90%), linear-gradient(to top, rgba(7, 7, 8, 0.92), transparent 40%); }
     .eyebrow, .kicker { margin: 0; font: 600 0.7rem/1.2 var(--sans); letter-spacing: 0.34em; text-transform: uppercase; color: var(--gold); }
     .eyebrow { display: flex; align-items: center; gap: 14px; }
     @media (max-width: 640px) {
@@ -108,14 +103,22 @@
       .hero::before { background: linear-gradient(to top, rgba(7, 7, 8, 0.94), rgba(7, 7, 8, 0.62) 58%, rgba(7, 7, 8, 0.3)); }
     }
     .eyebrow .rule { width: 46px; height: 1px; background: var(--line-strong); }
-    .now { max-width: 60rem; }
-    .now .place { margin: 18px 0 0; font: italic 300 clamp(2.2rem, 6vw, 4.6rem)/1 var(--serif); letter-spacing: -0.01em;
+    .now { max-width: 60rem; transform-origin: 0 100%;
+      transform: translateY(calc(var(--hero-scroll, 0) * -90px)) scale(calc(1 - var(--hero-scroll, 0) * 0.08)); opacity: calc(1 - var(--hero-scroll, 0) * 1.1); }
+    .hero .eyebrow { transform: translate3d(calc(var(--px, 0) * -10px), calc(var(--py, 0) * -8px), 0); transition: transform 0.6s var(--ease); }
+    .now .place { transform: translate3d(calc(var(--px, 0) * -18px), calc(var(--py, 0) * -12px), 0); transition: transform 0.6s var(--ease); }
+    .now .temp-row { transform: translate3d(calc(var(--px, 0) * -32px), calc(var(--py, 0) * -22px), 0); transition: transform 0.6s var(--ease); }
+    .now .icon { animation: bob 6s ease-in-out infinite; }
+    @keyframes bob { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-12px) rotate(3deg); } }
+    .progress { position: fixed; left: 0; top: 0; z-index: 70; width: 100%; height: 2px; transform-origin: 0 50%; transform: scaleX(0); background: var(--gold-grad); pointer-events: none; }
+    .search button:active, .btn:active { transform: translateY(1px) scale(0.98); transition-duration: 0.08s; }
+    .now .place { margin: 18px 0 0; font: 600 clamp(1.8rem, 4.6vw, 3.4rem)/1.1 var(--sans); letter-spacing: -0.025em;
       background: var(--gold-grad); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: sheen 9s ease-in-out infinite; padding-right: 0.06em; }
     @keyframes sheen { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
     /* A soft shadow keeps the big type clear over a bright sky. */
     .now .place, .now .temp { filter: drop-shadow(0 2px 22px rgba(7, 7, 8, 0.55)); }
     .temp-row { display: flex; align-items: flex-end; gap: clamp(10px, 2vw, 24px); margin-top: 6px; }
-    .now .temp { font: 300 clamp(6rem, 21vw, 15rem)/0.86 var(--serif); letter-spacing: -0.04em; color: var(--ivory); font-variant-numeric: lining-nums; }
+    .now .temp { font: 200 clamp(6rem, 20vw, 13.5rem)/0.9 var(--sans); letter-spacing: -0.06em; color: var(--ivory); font-variant-numeric: tabular-nums; margin-left: -0.04em; }
     .now .icon { font-size: clamp(2.4rem, 6vw, 4.2rem); line-height: 1; padding-bottom: 0.4em; filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.4)); }
     .now .summary { margin: 14px 0 0; font-size: clamp(1.02rem, 1.5vw, 1.2rem); color: var(--text); }
     .range-now { margin-top: 4px; font: 600 0.78rem/1.4 var(--sans); letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); white-space: pre; }
@@ -131,6 +134,7 @@
     .search button:hover { border-color: var(--gold); color: var(--gold-hi); transform: translateY(-2px); }
     .search button.primary { border-color: transparent; color: #0d0a06; background: var(--gold-grad); background-size: 220% 100%; box-shadow: 0 10px 34px -12px rgba(214, 180, 108, 0.55); }
     .search button.primary:hover { color: #0d0a06; background-position: 100% 0; }
+    @media (max-width: 480px) { .search button { padding: 0 14px; letter-spacing: 0.12em; } }
     .suggestions { display: flex; flex-wrap: wrap; gap: 8px; max-width: 46rem; }
     .suggestions button { padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--glass-strong); color: var(--ivory); font: 500 0.9rem var(--sans); cursor: pointer; }
     .suggestions button:hover { border-color: var(--gold); color: var(--gold-hi); }
@@ -143,27 +147,60 @@
     main { padding: 0 var(--gutter) 40px; display: grid; gap: clamp(20px, 3vw, 32px); max-width: 1180px; margin: 0 auto; }
     main > * { min-width: 0; } /* a long strip scrolls inside its panel instead of widening the page */
     .card { padding: clamp(20px, 3.4vw, 40px); border-radius: var(--radius); border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); box-shadow: 0 30px 80px -40px rgba(0, 0, 0, 0.8); }
-    .card h2 { margin: 10px 0 0; font: 300 clamp(2rem, 4.6vw, 3.4rem)/1 var(--serif); color: var(--ivory); letter-spacing: -0.01em; }
-    .card h2 em { font-style: italic; background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 0.06em; }
+    .card h2 { margin: 10px 0 0; font: 600 clamp(1.6rem, 3.4vw, 2.4rem)/1.1 var(--sans); color: var(--ivory); letter-spacing: -0.03em; }
+    .card h2 em { font-style: normal; background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .desc { margin: 12px 0 0; max-width: 60ch; color: var(--muted); }
-    .reveal { opacity: 0; transform: translateY(28px); transition: opacity 1s var(--ease), transform 1s var(--ease); }
-    .reveal.in { opacity: 1; transform: none; }
+    /* 3D: a panel swings up into place as it scrolls into view, then tilts towards the pointer
+       (src/depth.js sets --rx/--ry, and --gx/--gy for the glint that follows it round the edge). */
+    .card { position: relative; transform-origin: 50% 70%;
+      transform: perspective(1400px) translate3d(0, var(--ey, 0px), var(--ez, 0px)) rotateX(calc(var(--ex, 0deg) + var(--rx, 0deg))) rotateY(var(--ry, 0deg));
+      transition: transform 0.9s var(--ease), opacity 0.9s var(--ease), box-shadow 0.4s; }
+    .reveal { opacity: 0; --ey: 80px; --ez: -160px; --ex: 16deg; }
+    .reveal.in { opacity: 1; --ey: 0px; --ez: 0px; --ex: 0deg; }
+    .card[data-flat] { transform: none; } /* a map never tilts: a click must land where it looks */
+    .card.lit, .tile.lit { transition-duration: 0.2s, 0.9s, 0.4s; }
+    .card.lit { box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(214, 180, 108, 0.12); }
+    .card::after, .tile::after {
+      content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; opacity: 0; transition: opacity 0.5s;
+      background: radial-gradient(420px circle at var(--gx, 50%) var(--gy, 50%), rgba(241, 220, 170, 0.8), transparent 45%);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+    }
+    .card::before, .tile::before {
+      content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 0.5s;
+      background: radial-gradient(640px circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 244, 220, 0.06), transparent 42%);
+    }
+    .lit::after, .lit::before { opacity: 1; }
 
     .strip { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; margin-top: 22px; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
-    .hour { flex: 0 0 84px; text-align: center; padding: 14px 6px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025); transition: border-color 0.3s, transform 0.4s var(--ease); }
-    .hour:hover { border-color: var(--line-strong); transform: translateY(-3px); }
+    .hour { flex: 0 0 84px; text-align: center; padding: 14px 6px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025);
+      transform: perspective(900px) translateZ(var(--cz, 0px)) rotateY(var(--cy, 0deg)) translateY(var(--lift, 0px)); opacity: var(--co, 1);
+      transition: transform 0.3s var(--ease), border-color 0.3s, opacity 0.3s; }
+    .hour:hover { border-color: var(--line-strong); --lift: -6px; }
+    .strip { cursor: grab; }
+    .strip.dragging { cursor: grabbing; user-select: none; }
+    .strip.dragging .hour { pointer-events: none; transition-duration: 0s; }
     .hour .h { font: 600 0.66rem/1 var(--sans); letter-spacing: 0.16em; color: var(--muted); }
     .hour .i { font-size: 22px; margin: 8px 0 4px; }
-    .hour .t { font: 400 1.5rem/1 var(--serif); color: var(--ivory); font-variant-numeric: tabular-nums; }
+    .hour .t { font: 500 1.25rem/1 var(--sans); color: var(--ivory); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
     .hour .r { margin-top: 4px; font-size: 11px; color: var(--gold); font-weight: 600; }
     .hour .p { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
     .hour .w { margin-top: 4px; font-size: 10.5px; color: var(--text-secondary); white-space: nowrap; font-variant-numeric: tabular-nums; }
     .arrow { display: inline-block; font-weight: 700; color: var(--gold); }
 
     .days { display: grid; margin-top: 18px; }
-    .day { display: grid; grid-template-columns: 70px 54px 1fr 70px; gap: 14px; align-items: center; padding: 14px 6px; border-bottom: 1px solid var(--line); }
+    .day { display: grid; grid-template-columns: 70px 54px 1fr 70px; gap: 14px; align-items: center; padding: 14px 6px; border-bottom: 1px solid var(--line); border-radius: 10px; transition: transform 0.4s var(--ease), background 0.3s; }
+    .day:hover { background: rgba(214, 180, 108, 0.05); transform: translateX(6px); }
     .day:last-child { border-bottom: 0; }
-    .day > span:first-child { font: 500 1.15rem/1.1 var(--serif); color: var(--ivory); }
+    /* An hour or a day shown in the sky, and the note that says so */
+    .hour, .day { cursor: pointer; }
+    .hour.on { border-color: var(--gold); background: rgba(214, 180, 108, 0.12); --lift: -6px; }
+    .day.on { background: rgba(214, 180, 108, 0.1); }
+    .sky-at { position: fixed; left: 50%; bottom: 22px; z-index: 30; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 10px 12px 10px 18px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--glass-strong); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); color: var(--ivory); font: 500 0.88rem/1.3 var(--sans); cursor: pointer; transform: translateX(-50%); box-shadow: 0 18px 50px -20px rgba(0, 0, 0, 0.9); animation: rise 0.4s var(--ease); }
+    .sky-at[hidden] { display: none; }
+    .sky-at span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sky-at b { flex: none; padding: 6px 12px; border-radius: 999px; background: var(--gold-grad); color: #1a1408; font: 700 0.66rem/1 var(--sans); letter-spacing: 0.16em; text-transform: uppercase; }
+    @keyframes rise { from { opacity: 0; transform: translate(-50%, 12px); } }
+    .day > span:first-child { font: 600 1rem/1.2 var(--sans); color: var(--ivory); }
     .day > span:first-child small.wind { display: block; margin-top: 3px; font: 500 11px var(--sans); color: var(--muted); white-space: nowrap; }
     .day .ic { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; font-size: 20px; }
     .day .ic small { font-size: 11px; color: var(--gold); font-weight: 600; white-space: nowrap; }
@@ -172,14 +209,21 @@
     .day .lo { flex: 0 0 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
     .day .track { flex: 1; position: relative; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.07); }
     .day .bar { position: absolute; inset: 0; background: linear-gradient(90deg, #7fb6d6, #d6b46c 55%, #e98a52); }
-    .day .hi { text-align: right; font: 400 1.25rem/1 var(--serif); color: var(--ivory); font-variant-numeric: tabular-nums; }
+    .day .hi { text-align: right; font: 600 1.05rem/1 var(--sans); color: var(--ivory); font-variant-numeric: tabular-nums; }
     @media (max-width: 560px) { .day { grid-template-columns: 52px 40px 1fr 46px; gap: 8px; } .day .lo { flex-basis: 2.6em; } }
 
     .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 12px; margin-top: 22px; }
-    .tile { display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025); transition: border-color 0.3s; }
+    .tile { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025);
+      transform: perspective(700px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transform-style: preserve-3d;
+      transition: transform 0.7s var(--ease), border-color 0.3s, box-shadow 0.4s; }
     .tile:hover { border-color: var(--line-strong); }
+    .tile.lit { box-shadow: 0 26px 44px -22px rgba(0, 0, 0, 0.85); }
+    .tile > h3 { transform: translateZ(14px); }
+    .tile > .value { transform: translateZ(36px); }
+    .tile > svg, .tile > .scale { transform: translateZ(24px); }
+    .tile > p { transform: translateZ(10px); }
     .tile h3 { margin: 0; font: 600 0.62rem/1.2 var(--sans); letter-spacing: 0.24em; text-transform: uppercase; color: var(--gold); }
-    .tile .value { font: 400 1.9rem/1.05 var(--serif); color: var(--ivory); font-variant-numeric: tabular-nums; }
+    .tile .value { font: 600 1.5rem/1.15 var(--sans); color: var(--ivory); letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
     .tile p { margin: auto 0 0; font-size: 0.84rem; line-height: 1.45; color: var(--text-secondary); }
     .scale { position: relative; height: 4px; margin: 6px 0; border-radius: 2px; }
     .scale.uv { background: linear-gradient(90deg, #4ade80, #eab308 30%, #f97316 55%, #ef4444 75%, #a855f7); }
@@ -233,7 +277,7 @@
 
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
-      .reveal { opacity: 1; transform: none; }
+      .reveal { opacity: 1; --ey: 0px; --ez: 0px; --ex: 0deg; }
     }
   </style>
 <!-- og -->
@@ -251,6 +295,7 @@
   <noscript><p style="position:relative;z-index:2;margin:16px;padding:12px 16px;border-radius:12px;background:#1a1610;color:#f1dcaa;border:1px solid #9c7a3c;font-family:system-ui,sans-serif">This page needs JavaScript for the forecast. Please enable it.</p></noscript>
   <a class="skip-link" href="#main">Skip to content</a>
   <canvas id="sky" aria-hidden="true"></canvas>
+  <button class="sky-at" id="skyAt" type="button" aria-live="polite" hidden></button>
   <div class="grain" aria-hidden="true"></div>
 
   <div class="site">
@@ -315,7 +360,7 @@
         <div class="tiles" id="tiles"></div>
       </section>
 
-      <section class="card reveal" id="mapCard" hidden>
+      <section class="card reveal" id="mapCard" data-flat hidden>
         <p class="kicker">The world</p>
         <h2>Every <em>place</em></h2>
         <p class="desc">Drag to turn the globe; scroll, pinch or use + and − to zoom. Keep going and it becomes a street map, down to single houses. Click or tap anywhere, or on a city's name, for the weather there.</p>
@@ -329,7 +374,9 @@
       <p>Built by <a href="https://umer-78.github.io/">Umer Hashmi</a> · <a href="https://github.com/umer-78/weather-now">Source on GitHub</a></p>
     </footer>
   </div>
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
   <script type="module" src="src/app.js"></script>
+  <script type="module" src="src/depth.js"></script>
   <script>
     // The bar firms up once you scroll, and each section rises in as it comes into view.
     (() => {
@@ -339,7 +386,7 @@
       onScroll();
       const io = 'IntersectionObserver' in window && new IntersectionObserver((entries) => {
         for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
-      }, { rootMargin: '0px 0px -8% 0px' });
+      }, { rootMargin: '0px 0px 12% 0px' }); // a panel enters a little before it is reached, as it starts lower and further back
       document.querySelectorAll('.reveal').forEach((el) => (io ? io.observe(el) : el.classList.add('in')));
     })();
   </script>
