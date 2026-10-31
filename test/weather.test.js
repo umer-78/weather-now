@@ -307,3 +307,27 @@ test('where the sun is between sunrise and sunset', () => {
   assert.equal(sunProgress('2026-10-16T05:00', '2026-10-16T06:00', '2026-10-16T18:00'), null);
   assert.equal(sunProgress('2026-10-16T21:00', '2026-10-16T06:00', '2026-10-16T18:00'), null);
 });
+
+test('saved or returned places are checked before use', async () => {
+  const { validPlace, checkForecast } = await import('../src/weather.js');
+  assert.equal(validPlace(null), null);
+  assert.equal(validPlace({ latitude: 'x', longitude: 2 }), null);
+  assert.equal(validPlace({ latitude: 91, longitude: 0 }), null);
+  assert.equal(validPlace({ latitude: 10, longitude: 181 }), null);
+  const p = validPlace({ name: ' Lahore ', admin1: 'Punjab', country_code: 'PK', latitude: '31.5', longitude: 74.3, junk: '<b>' });
+  assert.deepEqual(p, { latitude: 31.5, longitude: 74.3, name: 'Lahore', admin1: 'Punjab', country_code: 'PK' });
+  assert.equal(validPlace({ latitude: 1, longitude: 2 }).name, '1.00, 2.00');
+  assert.equal(validPlace({ name: 'x'.repeat(500), latitude: 1, longitude: 2 }).name.length, 120);
+
+  assert.match(checkForecast(null), /empty/);
+  assert.match(checkForecast({ error: true, reason: 'Latitude must be in range' }), /could not give a forecast/);
+  assert.match(checkForecast({ current: {} }), /no current conditions/);
+  assert.match(checkForecast({ current: { time: '2026-01-01T00:00', temperature_2m: 3 } }), /incomplete/);
+  assert.equal(checkForecast({ current: { time: '2026-01-01T00:00', temperature_2m: 3 }, hourly: { time: [] }, daily: { time: [] } }), null);
+});
+
+test('uv advice is empty for missing or impossible readings', () => {
+  assert.equal(uvAdvice(NaN).level, 'unknown');
+  assert.equal(uvAdvice(-1).level, 'unknown');
+  assert.match(uvAdvice(9).advice, /midday/);
+});

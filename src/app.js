@@ -3,6 +3,7 @@ import {
   dailyFromResponse, nextHours, forecastQuery, GEOCODE_URL, placeLabel, dewPoint, comfortLevel, rangeBar,
   formatWind, reverseQuery, placeFromReverse, formatDistance, rainOutlook, outlookText,
   airQuery, aqiLevel, moonPhase, pressureTrend, visibilityNote, feelsNote, sunProgress,
+  validPlace, checkForecast,
 } from './weather.js';
 import { coordinateLabel, parseCoordinates } from './geo.js';
 import { skyMood, hourConditions, sunTimes } from './mood.js';
@@ -10,9 +11,15 @@ import { skyMood, hourConditions, sunTimes } from './mood.js';
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// What this device saved last time, checked before use: storage outlives
+// versions and can be edited by hand, and a bad value must not stop the page.
+function savedPlace() {
+  try { return validPlace(JSON.parse(load('weather:place') || 'null')); } catch { return null; }
+}
+
 const state = {
-  unit: load('weather:unit') || 'c',
-  place: JSON.parse(load('weather:place') || 'null'),
+  unit: load('weather:unit') === 'f' ? 'f' : 'c',
+  place: savedPlace(),
   data: null,
   air: null,
   loadedAt: 0,
@@ -26,42 +33,66 @@ let preview = null;
 function load(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function save(key, value) { try { localStorage.setItem(key, value); } catch { /* private mode */ } }
 
-async function getJson(url) {
+// Errors a person can act on; the raw ones ("Failed to fetch", a status code)
+// go to the console instead of the page.
+async function getJson(url, { signal } = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
+  const stop = () => controller.abort();
+  signal?.addEventListener('abort', stop, { once: true });
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) throw new Error(`The weather service answered ${response.status}.`);
-    return await response.json();
+    const response = await fetch(url, { signal: controller.signal, credentials: 'omit', referrerPolicy: 'no-referrer' });
+    if (response.status === 429) throw new Error('The weather service is busy right now. Try again in a minute.');
+    if (!response.ok) throw new Error(response.status >= 500 ? 'The weather service is having trouble right now.' : 'The weather service could not answer that request.');
+    try { return await response.json(); } catch { throw new Error('The weather service sent an answer that could not be read.'); }
   } catch (err) {
-    if (err?.name === 'AbortError') {
-      throw new Error('The weather service took too long to respond.');
-    }
+    if (signal?.aborted) throw err; // superseded by a newer request: not an error to show
+    if (err?.name === 'AbortError') throw new Error('The weather service took too long to respond.');
+    if (err instanceof TypeError) { console.warn(err); throw new Error(navigator.onLine === false ? 'You appear to be offline.' : 'Could not reach the weather service.'); }
     throw err;
   } finally {
     clearTimeout(timeout);
+    signal?.removeEventListener('abort', stop);
   }
 }
 
 async function search(query) {
   const url = `${GEOCODE_URL}?${new URLSearchParams({ name: query, count: '6', language: 'en', format: 'json' })}`;
   const body = await getJson(url);
-  return body.results ?? [];
+  // only results the page can actually use
+  return (Array.isArray(body?.results) ? body.results : []).map(validPlace).filter(Boolean);
 }
 
 let latestRequest = 0;
+let inFlight = null;
 
-async function show(place) {
+async function show(raw) {
+  const place = validPlace(raw);
+  if (!place) throw new Error('That place has no usable coordinates.');
   const request = ++latestRequest;
+  // A newer pick cancels the one still loading, so slow answers cannot pile up.
+  inFlight?.abort();
+  const controller = inFlight = new AbortController();
   $('error').textContent = '';
-  // Air quality is a separate service; without it the page simply has no air tile.
-  const [data, air] = await Promise.all([
-    getJson(forecastQuery(place.latitude, place.longitude)),
-    getJson(airQuery(place.latitude, place.longitude)).catch(() => null),
-  ]);
+  setStatus(`Loading the forecast for ${placeLabel(place)}…`);
+  let data, air;
+  try {
+    // Air quality is a separate service; without it the page simply has no air tile.
+    [data, air] = await Promise.all([
+      getJson(forecastQuery(place.latitude, place.longitude), { signal: controller.signal }),
+      getJson(airQuery(place.latitude, place.longitude), { signal: controller.signal }).catch(() => null),
+    ]);
+  } catch (err) {
+    if (controller.signal.aborted && request !== latestRequest) return;
+    setStatus('');
+    throw err;
+  }
   // Answers can arrive out of order; a slow earlier one must not replace the place asked for last.
   if (request !== latestRequest) return;
+  setStatus('');
+  const problem = checkForecast(data);
+  if (problem) throw new Error(problem);
 
   // Only remember a place after its forecast has loaded successfully.
   state.place = place;
@@ -78,6 +109,12 @@ async function show(place) {
 // second, as Nominatim's usage policy asks, and only for the place still shown.
 let lastLookup = 0;
 let lookupTimer = 0;
+/** Short progress messages for screen readers and sighted users alike. */
+function setStatus(text) {
+  const el = $('status');
+  if (el) el.textContent = text;
+}
+
 function nameLater(place) {
   clearTimeout(lookupTimer);
   lookupTimer = setTimeout(async () => {
@@ -85,7 +122,9 @@ function nameLater(place) {
     try {
       const found = placeFromReverse(await getJson(reverseQuery(place.latitude, place.longitude, place.detail)));
       if (!found || state.place !== place) return; // open water, or the page has moved on
-      state.place = { ...place, ...found, unnamed: false };
+      const named = validPlace({ ...place, ...found, unnamed: false });
+      if (!named) return;
+      state.place = named;
       save('weather:place', JSON.stringify(state.place));
       render();
     } catch { /* the coordinates stay as its name */ }
@@ -132,7 +171,7 @@ function render() {
   $('updated').textContent = current.time ? `Updated ${current.time.slice(11, 16)} ${data.timezone_abbreviation ?? ''} local time` : '';
 
   $('hourly').innerHTML = nextHours(data.hourly, current.time, 24).map((hour) => `
-    <div class="hour" data-at="${esc(hour.time)}">
+    <div class="hour" data-at="${esc(hour.time)}" tabindex="0" role="button" aria-pressed="false" aria-label="${esc(`${hour.label}: ${describeCode(hour.code, hour.isDay).text}, ${formatTemperature(hour.temperature, unit)}${hour.rainChance ? `, ${hour.rainChance}% chance of precipitation` : ''}. Show this hour in the sky`)}">
       <div class="h">${esc(hour.label)}</div>
       <div class="i">${describeCode(hour.code, hour.isDay).icon}</div>
       <div class="t">${formatTemperature(hour.temperature, unit)}</div>
@@ -141,13 +180,15 @@ function render() {
       ${hour.wind == null ? '' : `<div class="w" title="Wind from ${windDirection(hour.windDirection)}">${arrow(hour.windDirection)} ${esc(formatWind(hour.wind, unit))}</div>`}
     </div>`).join('');
 
-  const coldest = Math.min(...days.map((d) => d.min));
-  const hottest = Math.max(...days.map((d) => d.max));
+  // missing figures are left out of the shared scale rather than turning it into NaN
+  const lows = days.map((d) => d.min).filter(Number.isFinite), highs = days.map((d) => d.max).filter(Number.isFinite);
+  const coldest = lows.length ? Math.min(...lows) : 0;
+  const hottest = highs.length ? Math.max(...highs) : 1;
   $('daily').innerHTML = days.map((day, i) => {
     // Every bar is drawn on the same track, so bars compare across days.
-    const { left, right } = rangeBar(day.min, day.max, coldest, hottest);
+    const { left, right } = Number.isFinite(day.min) && Number.isFinite(day.max) ? rangeBar(day.min, day.max, coldest, hottest) : { left: 0, right: 100 };
     return `
-    <div class="day" data-at="${esc(day.date)}T13:00">
+    <div class="day" data-at="${esc(day.date)}T13:00" tabindex="0" role="button" aria-pressed="false" aria-label="${esc(`${i === 0 ? 'Today' : day.weekday}: ${describeCode(day.code).text}, low ${formatTemperature(day.min, unit)}, high ${formatTemperature(day.max, unit)}${day.rainChance ? `, ${day.rainChance}% chance of precipitation` : ''}. Show this day's afternoon in the sky`)}">
       <span>${i === 0 ? 'Today' : esc(day.weekday)}${day.wind == null ? '' : `<small class="wind" title="Strongest wind${
         day.gusts == null ? '' : `, gusts to ${esc(formatWind(day.gusts, unit))}`}">${arrow(day.windDirection)} ${esc(formatWind(day.wind, unit))}</small>`}</span>
       <span class="ic" title="${esc(describeCode(day.code).text)}">${describeCode(day.code).icon}${
@@ -224,8 +265,8 @@ function backToNow() {
   paintSky();
 }
 function markPreview() {
-  for (const el of document.querySelectorAll('[data-at].on')) el.classList.remove('on');
-  if (preview) for (const el of document.querySelectorAll(`[data-at="${preview.at}"]`)) el.classList.add('on');
+  for (const el of document.querySelectorAll('[data-at].on')) { el.classList.remove('on'); el.setAttribute('aria-pressed', 'false'); }
+  if (preview) for (const el of document.querySelectorAll('[data-at]')) if (el.dataset.at === preview.at) { el.classList.add('on'); el.setAttribute('aria-pressed', 'true'); }
 }
 let leaving = 0;
 let pressed = null;
@@ -245,6 +286,15 @@ for (const list of [$('hourly'), $('daily')]) {
     const at = e.target.closest('[data-at]')?.dataset.at;
     // a drag or a swipe along the strip is not a choice
     if (!at || (pressed && Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) > 8)) return;
+    if (preview?.chosen && preview.at === at) backToNow();
+    else showHour(at, true);
+  });
+  // the same choice from the keyboard
+  list.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const at = e.target.closest('[data-at]')?.dataset.at;
+    if (!at) return;
+    e.preventDefault();
     if (preview?.chosen && preview.at === at) backToNow();
     else showHour(at, true);
   });
@@ -314,7 +364,7 @@ function tiles(data, days, outlook, unit) {
   out.push(tile('🌡️', 'Feels like', formatTemperature(current.apparent_temperature, unit), feelsNote(current)));
 
   const dew = dewPoint(current.temperature_2m, current.relative_humidity_2m);
-  out.push(tile('💧', 'Humidity', `${current.relative_humidity_2m}%`,
+  out.push(tile('💧', 'Humidity', Number.isFinite(current.relative_humidity_2m) ? `${Math.round(current.relative_humidity_2m)}%` : '—',
     dew == null ? '' : `The dew point is ${formatTemperature(dew, unit)}: ${comfortLevel(dew)}.`));
 
   if (current.visibility != null) {
@@ -351,13 +401,14 @@ async function runSearch(query) {
   try {
     const results = await search(query);
     if (!results.length) {
-      $('error').textContent = `Nothing found for "${query}".`;
+      $('error').textContent = `Nothing found for "${query.slice(0, 80)}". Check the spelling, add the country (e.g. "Paris, FR"), or type coordinates like 31.56, 74.35.`;
       return;
     }
-    if (results.length === 1) return show(results[0]);
-    $('suggestions').innerHTML = results.map((place, i) =>
-      `<button type="button" data-index="${i}">${esc(placeLabel(place))}</button>`).join('');
+    if (results.length === 1) return show(results[0]).catch(fail);
+    $('suggestions').innerHTML = `<p class="sr-only" id="suggestHint">${results.length} places match. Pick one.</p>${results.map((place, i) =>
+      `<button type="button" data-index="${i}">${esc(placeLabel(place))}</button>`).join('')}`;
     $('suggestions').hidden = false;
+    $('suggestions').querySelector('button')?.focus();
     $('suggestions').querySelectorAll('button').forEach((button) => {
       button.addEventListener('click', () => {
         $('suggestions').hidden = true;
@@ -371,15 +422,25 @@ async function runSearch(query) {
 }
 
 function fail(err) {
-  $('error').textContent = `${err.message} Check your connection and try again.`;
+  if (err?.name === 'AbortError') return; // replaced by a newer request
+  setStatus('');
+  const message = String(err?.message || 'Something went wrong.');
+  $('error').textContent = /connection|offline|reach/i.test(message) ? `${message} Check your connection and try again.` : `${message} Try again in a moment.`;
   // A pick that failed must not leave the marker on a spot whose weather is not shown.
   render();
 }
 
-$('searchForm').addEventListener('submit', (e) => {
+// One search at a time: a double press or a held Enter used to send several.
+let searching = false;
+$('searchForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const query = $('place').value.trim();
-  if (query) runSearch(query);
+  const query = $('place').value.trim().slice(0, 120);
+  if (!query || searching) return;
+  searching = true;
+  try { await runSearch(query); } finally { searching = false; }
+});
+$('suggestions').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { $('suggestions').hidden = true; $('place').focus(); }
 });
 
 $('units').addEventListener('click', () => {

@@ -3,6 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Only this site's files, the pinned jsDelivr CDN and the import map below (by its
+       hash: change the map, update the hash; test/page.test.js checks) may run code.
+       Network access is limited to Open-Meteo, OpenStreetMap and the CDN. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; script-src 'self' 'sha256-gGBMy7aDnHeWxwjS1IWbYtRJ6eGNvL5bC7uZgb9+vrE=' https://cdn.jsdelivr.net; script-src-attr 'none'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data:; img-src 'self' data: blob: https://tile.openstreetmap.org https://cdn.jsdelivr.net; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://air-quality-api.open-meteo.com https://nominatim.openstreetmap.org https://tile.openstreetmap.org https://cdn.jsdelivr.net; upgrade-insecure-requests">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Weather Now — Live Weather, 10-Day Forecast & a 3D World</title>
   <meta property="og:type" content="website">
   <meta property="og:title" content="Weather Now — Live Weather, 10-Day Forecast & a 3D World">
@@ -135,10 +140,17 @@
     .search button.primary { border-color: transparent; color: #0d0a06; background: var(--gold-grad); background-size: 220% 100%; box-shadow: 0 10px 34px -12px rgba(214, 180, 108, 0.55); }
     .search button.primary:hover { color: #0d0a06; background-position: 100% 0; }
     @media (max-width: 480px) { .search button { padding: 0 14px; letter-spacing: 0.12em; } }
+    /* an author display rule beats the hidden attribute, so every hidden element is hidden explicitly */
+    [hidden] { display: none !important; }
     .suggestions { display: flex; flex-wrap: wrap; gap: 8px; max-width: 46rem; }
     .suggestions button { padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--glass-strong); color: var(--ivory); font: 500 0.9rem var(--sans); cursor: pointer; }
     .suggestions button:hover { border-color: var(--gold); color: var(--gold-hi); }
     .error { margin: 0; min-height: 1.4em; color: var(--bad); font-size: 0.92rem; }
+    .error:not(:empty)::before { content: '⚠ '; }
+    .status { margin: 0; color: var(--muted); font-size: 0.86rem; }
+    .status:empty { display: none; }
+    .hour:focus-visible, .day:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
+    .day, .hour { cursor: pointer; }
     .scroll-cue { position: absolute; right: var(--gutter); bottom: clamp(28px, 6vh, 64px); width: 22px; height: 38px; border: 1px solid var(--line-strong); border-radius: 12px; }
     .scroll-cue span { position: absolute; left: 50%; top: 7px; width: 2px; height: 7px; margin-left: -1px; border-radius: 1px; background: var(--gold); animation: cue 2s var(--ease) infinite; }
     @keyframes cue { 0% { opacity: 0; transform: translateY(0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(14px); } }
@@ -279,6 +291,14 @@
       *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
       .reveal { opacity: 1; --ey: 0px; --ez: 0px; --ex: 0deg; }
     }
+
+    /* "Copy link" (src/page.js) */
+    .share-link-row { display: flex; justify-content: flex-end; margin: 10px 0 0; }
+    .share-link-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font: inherit; max-width: 100%; }
+    .share-link-btn svg { width: 16px; height: 16px; flex: none; }
+    .share-link-out { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 50; max-width: 560px; margin: 0 auto; display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 10px; background: var(--glass-strong); color: var(--text); border: 1px solid var(--line-strong); box-shadow: 0 18px 40px rgba(0,0,0,.5); backdrop-filter: blur(14px); font-size: 14px; }
+    .share-link-out input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: rgba(255,246,225,.05); color: inherit; }
+    .share-link-out button { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--line-strong); background: transparent; color: var(--gold-hi); cursor: pointer; }
   </style>
 <!-- og -->
 <meta property="og:type" content="website">
@@ -330,13 +350,15 @@
       <form id="searchForm" class="search" autocomplete="off">
         <div>
           <label for="place" class="sr-only">Place</label>
-          <input id="place" type="search" placeholder="Search a city, or type coordinates…" required>
+          <input id="place" type="search" placeholder="Search a city, or type coordinates…" maxlength="120" spellcheck="false" aria-describedby="placeHelp" required>
+          <span id="placeHelp" class="sr-only">A city name, or coordinates such as 31.56, 74.35</span>
         </div>
         <button class="primary" type="submit">Search</button>
         <button type="button" id="locate">Use my location</button>
-        <button type="button" id="units" aria-label="Switch units">°C</button>
+        <button type="button" id="units" aria-label="Switch between Celsius and Fahrenheit">°C</button>
       </form>
-      <div id="suggestions" class="suggestions" hidden></div>
+      <div id="suggestions" class="suggestions" role="group" aria-label="Matching places" hidden></div>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
       <p class="error" id="error" role="alert"></p>
       <a class="scroll-cue" href="#hourlyCard" aria-label="Scroll to the forecast"><span></span></a>
     </header>
@@ -345,13 +367,13 @@
       <section class="card reveal" id="hourlyCard" hidden>
         <p class="kicker">The day ahead</p>
         <h2>Next <em>24 hours</em></h2>
-        <div class="strip" id="hourly"></div>
+        <div class="strip" id="hourly" role="group" aria-label="Hourly forecast; choose an hour to show it in the sky"></div>
       </section>
 
       <section class="card reveal" id="dailyCard" hidden>
         <p class="kicker">Ten days</p>
         <h2>The <em>forecast</em></h2>
-        <div class="days" id="daily"></div>
+        <div class="days" id="daily" role="group" aria-label="Ten-day forecast; choose a day to show it in the sky"></div>
       </section>
 
       <section class="card reveal" id="detailsCard" hidden>
@@ -371,132 +393,13 @@
 
     <footer>
       <p>Forecast and air quality from <a href="https://open-meteo.com/">Open-Meteo</a>, free for non-commercial use · Street map and place names © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors</p>
+      <p>Forecasts are model output for a grid point near the place, updated about every 15 minutes; local conditions can differ. For safety decisions, check your national weather service.</p>
       <p>Built by <a href="https://umer-78.github.io/">Umer Hashmi</a> · <a href="https://github.com/umer-78/weather-now">Source on GitHub</a></p>
     </footer>
   </div>
   <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
   <script type="module" src="src/app.js"></script>
   <script type="module" src="src/depth.js"></script>
-  <script>
-    // The bar firms up once you scroll, and each section rises in as it comes into view.
-    (() => {
-      const nav = document.getElementById('nav');
-      const onScroll = () => nav.classList.toggle('scrolled', scrollY > 40);
-      addEventListener('scroll', onScroll, { passive: true });
-      onScroll();
-      const io = 'IntersectionObserver' in window && new IntersectionObserver((entries) => {
-        for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
-      }, { rootMargin: '0px 0px 12% 0px' }); // a panel enters a little before it is reached, as it starts lower and further back
-      document.querySelectorAll('.reveal').forEach((el) => (io ? io.observe(el) : el.classList.add('in')));
-    })();
-  </script>
-
-  <!-- share-link: "Copy link" saves this demo's inputs in the URL (?s=...) so the link reopens with the same result. -->
-  <style>
-    .share-link-row { display: flex; justify-content: flex-end; margin: 10px 0 0; }
-    .share-link-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font: inherit; max-width: 100%; }
-    .share-link-btn svg { width: 16px; height: 16px; flex: none; }
-    .share-link-out { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 50; max-width: 560px; margin: 0 auto; display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 10px; background: #111827; color: #f9fafb; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 10px 30px rgba(0,0,0,.35); font-size: 14px; }
-    .share-link-out input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,.25); background: #1f2937; color: inherit; }
-    .share-link-out button { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,.25); background: transparent; color: inherit; cursor: pointer; }
-  </style>
-  <script>
-    (() => {
-      const FIELDS = ["place"];
-      const RUN = "searchForm"; // a button to press after restoring, for pages that do not recompute on input
-      const $ = (id) => document.getElementById(id);
-      const enc = (o) => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      const dec = (s) => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
-      const value = (f) => (f.type === 'checkbox' ? f.checked : f.value);
-      const DEFAULTS = Object.fromEntries(FIELDS.filter((id) => $(id)).map((id) => [id, value($(id))]));
-      // Only what differs from the page's own starting values goes in the link, so it stays short.
-      const read = () => {
-        const o = {};
-        for (const id of FIELDS) { const f = $(id); if (f && value(f) !== DEFAULTS[id]) o[id] = value(f); }
-        return o;
-      };
-      const apply = (o) => {
-        for (const id of FIELDS) {
-          const f = $(id);
-          if (!f || !(id in o)) continue;
-          if (f.type === 'checkbox') f.checked = !!o[id];
-          else if (f.tagName === 'SELECT' && ![...f.options].some((op) => op.value === String(o[id]))) continue;
-          else f.value = o[id];
-          f.dispatchEvent(new Event('input', { bubbles: true }));
-          f.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        const run = RUN && $(RUN);
-        if (run?.tagName === 'FORM') run.requestSubmit(); else run?.click();
-      };
-      const show = (url) => {
-        document.querySelector('.share-link-out')?.remove();
-        const box = document.createElement('div');
-        box.className = 'share-link-out';
-        box.setAttribute('role', 'status');
-        box.innerHTML = '<span>Link copied</span><input readonly aria-label="Shareable link"><button type="button">Close</button>';
-        box.querySelector('input').value = url;
-        box.querySelector('button').addEventListener('click', () => box.remove());
-        document.body.append(box);
-        return box;
-      };
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn share-link-btn';
-      btn.title = 'Copy a link that reopens this demo with your current inputs';
-      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><span>Copy link</span>';
-      btn.addEventListener('click', async () => {
-        const url = `${location.origin}${location.pathname}?s=${enc(read())}`;
-        btn.dataset.link = url;
-        const box = show(url);
-        try { await navigator.clipboard.writeText(url); }
-        catch { box.querySelector('span').textContent = 'Copy this link:'; box.querySelector('input').select(); }
-        if (url.length > 8000) box.querySelector('span').textContent = 'Long link (some apps may cut it):';
-      });
-      // In the header's action row when it fits; on its own row under the header when it would push the page sideways.
-      const actions = document.querySelector('header .actions') || document.querySelector('.actions');
-      const row = document.createElement('div');
-      row.className = 'share-link-row';
-      const place = () => {
-        if (!actions) { if (!row.isConnected) { row.append(btn); document.body.prepend(row); } return; }
-        if (btn.parentElement !== actions) actions.append(btn);
-        if (actions.getBoundingClientRect().right > document.documentElement.clientWidth + 1) {
-          row.append(btn);
-          (actions.closest('header') || actions).after(row);
-        } else row.remove();
-      };
-      place();
-      let resizeTimer = 0;
-      window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(place, 150); });
-      const s = new URLSearchParams(location.search).get('s');
-      if (s) {
-        let o = null;
-        try { o = dec(s); } catch { /* a damaged link just opens the demo as normal */ }
-        if (o && typeof o === 'object') {
-          const go = () => setTimeout(() => apply(o), 80);
-          if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
-        }
-      }
-    })();
-  </script>
-  <!-- site-fixes-js --><script>
-    (() => {
-      const FOCUSABLE = 'a[href],button,input,select,textarea,[tabindex]';
-      const fix = () => {
-        for (const el of document.querySelectorAll('body *')) {
-          if (el.hasAttribute('tabindex') || el.closest('svg')) continue;
-          const cs = getComputedStyle(el);
-          if (!/(auto|scroll)/.test(cs.overflowX + cs.overflowY)) continue;
-          if (el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1) continue;
-          if (el.querySelector(FOCUSABLE)) continue;
-          el.tabIndex = 0;
-          el.setAttribute('data-scroll-focus', '');
-        }
-      };
-      let t = 0;
-      const soon = () => { clearTimeout(t); t = setTimeout(fix, 400); };
-      window.addEventListener('load', () => { fix(); new MutationObserver(soon).observe(document.body, { childList: true, subtree: true }); });
-      window.addEventListener('resize', soon);
-    })();
-  </script>
+  <script type="module" src="src/page.js"></script>
 </body>
 </html>
