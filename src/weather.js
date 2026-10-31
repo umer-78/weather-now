@@ -60,14 +60,15 @@ export function windDirection(degrees) {
 
 /** UV index bands, as published by the WHO. */
 export function uvAdvice(index) {
-  if (index === null || index === undefined) return { level: 'unknown', advice: '' };
+  if (index === null || index === undefined || !Number.isFinite(+index) || index < 0) return { level: 'unknown', advice: '' };
   // The bands are defined on the whole-number index, so 7.6 is 8: very high.
   index = Math.round(index);
-  if (index < 3) return { level: 'low', advice: 'No protection needed.' };
-  if (index < 6) return { level: 'moderate', advice: 'Wear sunglasses; use sunscreen at midday.' };
-  if (index < 8) return { level: 'high', advice: 'Sunscreen, hat, shade between 11am and 4pm.' };
-  if (index < 11) return { level: 'very high', advice: 'Avoid the sun between 11am and 4pm.' };
-  return { level: 'extreme', advice: 'Stay indoors around midday.' };
+  // Advice as the WHO's UV index guide gives it, in plain words.
+  if (index < 3) return { level: 'low', advice: 'Little risk for most people. Sunglasses on bright days; sunscreen if you burn easily or are near snow or water.' };
+  if (index < 6) return { level: 'moderate', advice: 'Seek shade around midday. Cover up, and wear a hat, sunglasses and SPF 30+ sunscreen.' };
+  if (index < 8) return { level: 'high', advice: 'Cut time in the sun around midday (roughly 10am–4pm). Shade, a shirt, hat, sunglasses and SPF 30+, reapplied every two hours.' };
+  if (index < 11) return { level: 'very high', advice: 'Extra protection needed: avoid the sun around midday (roughly 10am–4pm); unprotected skin burns quickly.' };
+  return { level: 'extreme', advice: 'Avoid being outside around midday; unprotected skin can burn very quickly. Full cover, hat, sunglasses and SPF 30+.' };
 }
 
 /** "Feels like" is already provided by the API; this is the wind-chill side of
@@ -313,4 +314,32 @@ export function placeFromReverse(body) {
 
 export function placeLabel(place) {
   return [place.name, place.admin1, place.country_code].filter(Boolean).join(', ');
+}
+
+/**
+ * A place as saved on this device or returned by the geocoder, checked before
+ * it reaches a request or the page: finite coordinates in range and short text
+ * fields. Anything else gives null, so a damaged save cannot break the page.
+ */
+export function validPlace(place) {
+  if (!place || typeof place !== 'object') return null;
+  const latitude = Number(place.latitude), longitude = Number(place.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  const text = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+  const out = { latitude, longitude, name: text(place.name, 120) ?? `${latitude.toFixed(2)}, ${longitude.toFixed(2)}` };
+  for (const [key, max] of [['admin1', 80], ['country', 80], ['country_code', 3]]) { const v = text(place[key], max); if (v) out[key] = v; }
+  if (place.unnamed === true) out.unnamed = true;
+  if (Number.isFinite(place.accuracy) && place.accuracy >= 0) out.accuracy = place.accuracy;
+  if (Number.isInteger(place.detail) && place.detail >= 0 && place.detail <= 20) out.detail = place.detail;
+  return out;
+}
+
+/** Whether a forecast response has what the page draws; partial answers are rejected with a reason. */
+export function checkForecast(data) {
+  if (!data || typeof data !== 'object') return 'The weather service sent an empty answer.';
+  if (data.error) return `The weather service could not give a forecast here${typeof data.reason === 'string' ? ` (${data.reason.slice(0, 120)})` : ''}.`;
+  const c = data.current;
+  if (!c || typeof c !== 'object' || typeof c.time !== 'string' || !Number.isFinite(c.temperature_2m)) return 'The weather service sent no current conditions for this place.';
+  if (!Array.isArray(data.hourly?.time) || !Array.isArray(data.daily?.time)) return 'The weather service sent an incomplete forecast for this place.';
+  return null;
 }

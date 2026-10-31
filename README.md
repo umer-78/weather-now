@@ -70,7 +70,7 @@ No framework, no build step, no tracking.
 Node's runner:
 
 ```bash
-node --test      # 42 tests
+node --test      # 47 tests
 ```
 
 Covering the WMO weather-code table, temperature conversion and rounding,
@@ -121,7 +121,19 @@ python3 -m http.server 8080
   the globe waits and draws again, and without WebGL the map card stays hidden
   and the rest of the page is unchanged.
 - `localStorage` is wrapped in try/catch, so private mode degrades to "no saved
-  place" instead of a blank page.
+  place" instead of a blank page. A saved place is re-checked on load
+  (`validPlace`): damaged or hand-edited data falls back to the default city.
+- Responses are checked before drawing (`checkForecast`); a partial or error
+  answer shows a plain message instead of a broken page, and a newer search
+  cancels the request still loading (`AbortController`).
+- **Content-Security-Policy:** scripts only from the site, the pinned jsDelivr
+  CDN and the hash-pinned import map (no inline scripts or handlers); network
+  access only to Open-Meteo, OpenStreetMap and the CDN. `test/page.test.js`
+  keeps the policy, the import-map hash and the hosts in step.
+- The hourly strip and the ten days work from the keyboard: Tab to an hour or a
+  day, Enter or Space to show it in the sky, Esc to come back to now.
+- Forecasts are model output for a grid point near the place; local conditions
+  can differ. Check your national weather service for warnings.
 
 ## License
 
