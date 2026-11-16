@@ -156,7 +156,9 @@
     @keyframes cue { 0% { opacity: 0; transform: translateY(0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(14px); } }
 
     /* Sections: glass panels */
-    main { padding: 0 var(--gutter) 40px; display: grid; gap: clamp(20px, 3vw, 32px); max-width: 1180px; margin: 0 auto; }
+    main { padding: 0 var(--gutter); display: grid; gap: clamp(20px, 3vw, 32px); max-width: 1180px; margin: 0 auto; }
+    /* no forecast yet: no empty band between the search and the footer */
+    main:has(> :not([hidden])) { padding-bottom: 40px; }
     main > * { min-width: 0; } /* a long strip scrolls inside its panel instead of widening the page */
     .card { padding: clamp(20px, 3.4vw, 40px); border-radius: var(--radius); border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); box-shadow: 0 30px 80px -40px rgba(0, 0, 0, 0.8); }
     .card h2 { margin: 10px 0 0; font: 600 clamp(1.6rem, 3.4vw, 2.4rem)/1.1 var(--sans); color: var(--ivory); letter-spacing: -0.03em; }

@@ -46,6 +46,16 @@ function pause(ms, signal) {
   });
 }
 
+// A short wait is "busy". A long one is said plainly: Open-Meteo answers 429
+// with a Retry-After of hours once a network has used its daily allowance.
+function busyError(retryAfter) {
+  const secs = Number(retryAfter);
+  const spent = retryAfter != null && Number.isFinite(secs) && secs > 300;
+  const err = new Error(spent ? 'The weather service has reached its daily limit for this network.' : 'The weather service is busy right now.');
+  err.hint = spent ? 'Try again later, or from another network.' : 'Try again in a moment.';
+  return err;
+}
+
 // Errors a person can act on; the raw ones ("Failed to fetch", a status code)
 // go to the console instead of the page. A busy service (429, 503) is asked
 // again after a short wait, at most twice.
@@ -59,9 +69,10 @@ async function getJson(url, { signal } = {}) {
     try {
       const response = await fetch(url, { signal: controller.signal, credentials: 'omit', referrerPolicy: 'no-referrer' });
       const busy = response.status === 429 || response.status === 503;
-      wait = busy && attempt < 2 ? retryDelay(response.headers.get('Retry-After'), attempt) : null;
+      const retryAfter = response.headers.get('Retry-After');
+      wait = busy && attempt < 2 ? retryDelay(retryAfter, attempt) : null;
       if (wait == null) {
-        if (busy) throw new Error('The weather service is busy right now.');
+        if (busy) throw busyError(retryAfter);
         if (!response.ok) throw new Error(response.status >= 500 ? 'The weather service is having trouble right now.' : 'The weather service could not answer that request.');
         try { return await response.json(); } catch { throw new Error('The weather service sent an answer that could not be read.'); }
       }
@@ -466,7 +477,8 @@ function fail(err) {
   if (err?.name === 'AbortError') return; // replaced by a newer request
   setStatus('');
   const message = String(err?.message || 'Something went wrong.');
-  $('error').textContent = /connection|offline|reach/i.test(message) ? `${message} Check your connection and try again.` : `${message} Try again in a moment.`;
+  const hint = err?.hint || (/connection|offline|\breach\b/i.test(message) ? 'Check your connection and try again.' : 'Try again in a moment.');
+  $('error').textContent = `${message} ${hint}`;
   // A pick that failed must not leave the marker on a spot whose weather is not shown.
   render();
 }
