@@ -7,6 +7,7 @@ import {
 } from './weather.js';
 import { coordinateLabel, parseCoordinates } from './geo.js';
 import { skyMood, hourConditions, sunTimes } from './mood.js';
+import { createCache, retryDelay } from './cache.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -33,33 +34,70 @@ let preview = null;
 function load(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function save(key, value) { try { localStorage.setItem(key, value); } catch { /* private mode */ } }
 
-// Errors a person can act on; the raw ones ("Failed to fetch", a status code)
-// go to the console instead of the page.
-async function getJson(url, { signal } = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-  const stop = () => controller.abort();
-  signal?.addEventListener('abort', stop, { once: true });
+const answers = createCache((() => { try { return localStorage; } catch { return null; } })());
 
+// Waits out a busy service, unless the request is cancelled meanwhile.
+function pause(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new DOMException('Superseded', 'AbortError')); return; }
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', cancel); resolve(); }, ms);
+    function cancel() { clearTimeout(timer); reject(new DOMException('Superseded', 'AbortError')); }
+    signal?.addEventListener('abort', cancel, { once: true });
+  });
+}
+
+// Errors a person can act on; the raw ones ("Failed to fetch", a status code)
+// go to the console instead of the page. A busy service (429, 503) is asked
+// again after a short wait, at most twice.
+async function getJson(url, { signal } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const stop = () => controller.abort();
+    signal?.addEventListener('abort', stop, { once: true });
+    let wait = null;
+    try {
+      const response = await fetch(url, { signal: controller.signal, credentials: 'omit', referrerPolicy: 'no-referrer' });
+      const busy = response.status === 429 || response.status === 503;
+      wait = busy && attempt < 2 ? retryDelay(response.headers.get('Retry-After'), attempt) : null;
+      if (wait == null) {
+        if (busy) throw new Error('The weather service is busy right now.');
+        if (!response.ok) throw new Error(response.status >= 500 ? 'The weather service is having trouble right now.' : 'The weather service could not answer that request.');
+        try { return await response.json(); } catch { throw new Error('The weather service sent an answer that could not be read.'); }
+      }
+    } catch (err) {
+      if (signal?.aborted) throw err; // superseded by a newer request: not an error to show
+      if (err?.name === 'AbortError') throw new Error('The weather service took too long to respond.');
+      if (err instanceof TypeError) { console.warn(err); throw new Error(navigator.onLine === false ? 'You appear to be offline.' : 'Could not reach the weather service.'); }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+      signal?.removeEventListener('abort', stop);
+    }
+    await pause(wait, signal);
+  }
+}
+
+// The same, through the saved answers: a fresh one is used as is, and when the
+// service cannot answer, a saved one stands in. `at` is when the answer was
+// fetched, and `saved` marks a stand-in.
+async function getJsonSaved(url, { signal } = {}) {
+  const hit = answers.get(url);
+  if (hit?.fresh) return { body: hit.body, at: hit.at, saved: false };
   try {
-    const response = await fetch(url, { signal: controller.signal, credentials: 'omit', referrerPolicy: 'no-referrer' });
-    if (response.status === 429) throw new Error('The weather service is busy right now. Try again in a minute.');
-    if (!response.ok) throw new Error(response.status >= 500 ? 'The weather service is having trouble right now.' : 'The weather service could not answer that request.');
-    try { return await response.json(); } catch { throw new Error('The weather service sent an answer that could not be read.'); }
+    const body = await getJson(url, { signal });
+    answers.put(url, body);
+    return { body, at: Date.now(), saved: false };
   } catch (err) {
-    if (signal?.aborted) throw err; // superseded by a newer request: not an error to show
-    if (err?.name === 'AbortError') throw new Error('The weather service took too long to respond.');
-    if (err instanceof TypeError) { console.warn(err); throw new Error(navigator.onLine === false ? 'You appear to be offline.' : 'Could not reach the weather service.'); }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-    signal?.removeEventListener('abort', stop);
+    if (signal?.aborted || !hit) throw err;
+    console.warn(`Using the answer saved at ${new Date(hit.at).toLocaleTimeString()}:`, err?.message);
+    return { body: hit.body, at: hit.at, saved: true };
   }
 }
 
 async function search(query) {
   const url = `${GEOCODE_URL}?${new URLSearchParams({ name: query, count: '6', language: 'en', format: 'json' })}`;
-  const body = await getJson(url);
+  const { body } = await getJsonSaved(url);
   // only results the page can actually use
   return (Array.isArray(body?.results) ? body.results : []).map(validPlace).filter(Boolean);
 }
@@ -76,12 +114,12 @@ async function show(raw) {
   const controller = inFlight = new AbortController();
   $('error').textContent = '';
   setStatus(`Loading the forecast for ${placeLabel(place)}…`);
-  let data, air;
+  let forecast, air;
   try {
     // Air quality is a separate service; without it the page simply has no air tile.
-    [data, air] = await Promise.all([
-      getJson(forecastQuery(place.latitude, place.longitude), { signal: controller.signal }),
-      getJson(airQuery(place.latitude, place.longitude), { signal: controller.signal }).catch(() => null),
+    [forecast, air] = await Promise.all([
+      getJsonSaved(forecastQuery(place.latitude, place.longitude), { signal: controller.signal }),
+      getJsonSaved(airQuery(place.latitude, place.longitude), { signal: controller.signal }).then((r) => r.body, () => null),
     ]);
   } catch (err) {
     if (controller.signal.aborted && request !== latestRequest) return;
@@ -90,7 +128,9 @@ async function show(raw) {
   }
   // Answers can arrive out of order; a slow earlier one must not replace the place asked for last.
   if (request !== latestRequest) return;
-  setStatus('');
+  const data = forecast.body;
+  // A saved forecast says its own time ("Updated 14:05"); the status line says why.
+  setStatus(forecast.saved ? 'The weather service is busy, so this is the last forecast it sent. It will refresh on its own.' : '');
   const problem = checkForecast(data);
   if (problem) throw new Error(problem);
 
@@ -99,7 +139,8 @@ async function show(raw) {
   save('weather:place', JSON.stringify(place));
   state.data = data;
   state.air = air?.current ?? null;
-  state.loadedAt = Date.now();
+  // A saved answer counts from when it was fetched, so it is refreshed on time.
+  state.loadedAt = forecast.at;
   render();
   if (place.unnamed) nameLater(place);
 }
