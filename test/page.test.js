@@ -13,7 +13,11 @@ test('the page has a strict Content-Security-Policy', () => {
 });
 
 test('the only inline script is the import map, allowed by its hash', () => {
-  const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g)];
+  // structured data for search engines is a data block: never run, so outside script-src
+  const all = [...html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g)];
+  const data = all.filter((m) => /type="application\/ld\+json"/.test(m[1]));
+  for (const m of data) assert.doesNotThrow(() => JSON.parse(m[2]), 'the structured data is valid JSON');
+  const inline = all.filter((m) => !data.includes(m));
   assert.equal(inline.length, 1);
   assert.match(inline[0][1], /type="importmap"/);
   const hash = createHash('sha256').update(inline[0][2]).digest('base64');
